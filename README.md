@@ -11,6 +11,7 @@ Register the marketplace once, then install the plugins you want:
 ```bash
 copilot plugin marketplace add osinfra-io/pt-ai-plugins
 copilot plugin install platform-conventions@osinfra-io
+copilot plugin install techne-onboarding@osinfra-io
 ```
 
 Browse everything available in the marketplace:
@@ -24,6 +25,7 @@ copilot plugin marketplace browse osinfra-io
 | Plugin | Description | Source |
 |---|---|---|
 | [platform-conventions](plugins/platform-conventions) | Shared platform workflows as Copilot skills (e.g. `create-pull-request`) | this repo |
+| [techne-onboarding](https://github.com/osinfra-io/pt-techne-agents) | The Nomos onboarding agent and its `pt-techne-mcp-server` tools | federated from `pt-techne-agents` |
 
 ## Plugins vs instructions
 
