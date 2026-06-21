@@ -21,7 +21,7 @@
       "source": {
         "source": "github",
         "repo": "osinfra-io/pt-techne-agents",
-        "ref": "0de1c58321b3be6f8eebe2b71cd6efd88664daaa"
+        "ref": "v0.0.1"
       }
     }
   ]
