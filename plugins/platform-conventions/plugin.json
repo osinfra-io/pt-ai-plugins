@@ -1,0 +1,16 @@
+{
+  "name": "platform-conventions",
+  "description": "Shared osinfra-io platform workflows as Copilot skills.",
+  "version": "0.1.0",
+  "author": {
+    "name": "osinfra-io"
+  },
+  "repository": "https://github.com/osinfra-io/pt-ai-plugins",
+  "license": "GPL-2.0",
+  "keywords": [
+    "osinfra-io",
+    "platform",
+    "pull-request"
+  ],
+  "skills": "skills/"
+}

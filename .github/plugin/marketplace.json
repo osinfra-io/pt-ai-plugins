@@ -1,0 +1,24 @@
+{
+  "name": "osinfra-io",
+  "owner": {
+    "name": "osinfra-io"
+  },
+  "metadata": {
+    "description": "osinfra-io platform Copilot CLI plugins",
+    "version": "0.1.0"
+  },
+  "plugins": [
+    {
+      "name": "platform-conventions",
+      "description": "Shared osinfra-io platform workflows as Copilot skills.",
+      "version": "0.1.0",
+      "source": "./plugins/platform-conventions"
+    },
+    {
+      "name": "techne-onboarding",
+      "description": "Self-serve osinfra-io platform onboarding — the Nomos agent and its pt-techne-mcp-server tools.",
+      "version": "0.1.0",
+      "source": "osinfra-io/pt-techne-agents"
+    }
+  ]
+}
