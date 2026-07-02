@@ -23,7 +23,7 @@ copilot plugin marketplace browse osinfra-io
 ## Plugins
 
 | Plugin | Description | Source |
-|---|---|---|
+| --- | --- | --- |
 | [platform-conventions](plugins/platform-conventions) | Shared platform workflows as Copilot skills (e.g. `create-pull-request`, `address-review-comments`) | this repo |
 | [nomos-agent](https://github.com/osinfra-io/pt-techne-agents) | The Nomos onboarding agent and its `pt-techne-mcp-server` tools | federated from `pt-techne-agents` |
 
