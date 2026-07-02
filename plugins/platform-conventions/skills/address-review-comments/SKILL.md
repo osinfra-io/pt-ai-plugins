@@ -19,13 +19,16 @@ Note the PR number and the `owner`/`repo` for the GraphQL calls below.
 ## 2. Fetch all unresolved review threads
 
 Use the GitHub GraphQL API to retrieve every review thread that is not yet resolved.
+`reviewThreads` is a paginated connection — loop with `after` until `hasNextPage` is `false`
+so no unresolved threads are missed on larger pull requests.
 
 ```bash
-gh api graphql -f query='
-  query($owner: String!, $repo: String!, $number: Int!) {
+gh api graphql --paginate -f query='
+  query($owner: String!, $repo: String!, $number: Int!, $after: String) {
     repository(owner: $owner, name: $repo) {
       pullRequest(number: $number) {
-        reviewThreads(first: 100) {
+        reviewThreads(first: 100, after: $after) {
+          pageInfo { hasNextPage endCursor }
           nodes {
             id
             isResolved
@@ -47,7 +50,9 @@ gh api graphql -f query='
 ' -f owner=OWNER -f repo=REPO -F number=PR_NUMBER
 ```
 
-Filter the result to nodes where `isResolved` is `false`. Work only with those threads.
+The `--paginate` flag makes `gh` follow `endCursor` automatically until `hasNextPage` is
+`false`, collecting all pages into a single result. Filter the combined result to nodes where
+`isResolved` is `false`. Work only with those threads.
 
 ## 3. Analyze every unresolved thread
 
