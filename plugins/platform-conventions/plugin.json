@@ -7,11 +7,5 @@
   },
   "repository": "https://github.com/osinfra-io/pt-ai-plugins",
   "license": "GPL-2.0",
-  "keywords": [
-    "code-review",
-    "osinfra-io",
-    "platform",
-    "pull-request"
-  ],
   "skills": "skills/"
 }
