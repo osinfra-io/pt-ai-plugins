@@ -15,7 +15,7 @@
       "source": "./plugins/platform-conventions"
     },
     {
-      "name": "techne-onboarding",
+      "name": "nomos-agent",
       "description": "Self-serve osinfra-io platform onboarding — the Nomos agent and its pt-techne-mcp-server tools.",
       "version": "0.1.0",
       "source": {
