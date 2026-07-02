@@ -1,7 +1,7 @@
 {
   "name": "platform-conventions",
   "description": "Shared osinfra-io platform workflows as Copilot skills.",
-  "version": "0.1.0",
+  "version": "0.1.1",
   "author": {
     "name": "osinfra-io"
   },
