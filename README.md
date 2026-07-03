@@ -32,13 +32,13 @@ copilot plugin marketplace browse osinfra-io
 The `nomos-agent` plugin runs the `pt-techne-mcp-server` as a Docker container. It requires:
 
 - **Docker** — the MCP server runs via `docker run`
-- **`GITHUB_TOKEN`** — must be set in your environment; the MCP server uses it to read team specs, compute CIDRs, look up users, and open pull requests on your behalf
+- **`NOMOS_GITHUB_TOKEN`** — must be set in your environment; the MCP server uses it to read team specs, compute CIDRs, look up users, and open pull requests on your behalf
 
 ```bash
-export GITHUB_TOKEN=<your-token>
+export NOMOS_GITHUB_TOKEN=<your-token>
 ```
 
-Without `GITHUB_TOKEN`, read tools return `not_configured` and write tools (PR creation) will not work.
+Without `NOMOS_GITHUB_TOKEN`, read tools return `not_configured` and write tools (PR creation) will not work.
 
 ## Plugins vs instructions
 
