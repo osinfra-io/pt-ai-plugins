@@ -27,6 +27,19 @@ copilot plugin marketplace browse osinfra-io
 | [platform-conventions](plugins/platform-conventions) | Shared platform workflows as Copilot skills (e.g. `create-pull-request`, `address-review-comments`) | this repo |
 | [nomos-agent](https://github.com/osinfra-io/pt-techne-agents) | The Nomos onboarding agent and its `pt-techne-mcp-server` tools | federated from `pt-techne-agents` |
 
+### nomos-agent requirements
+
+The `nomos-agent` plugin runs the `pt-techne-mcp-server` as a Docker container. It requires:
+
+- **Docker** — the MCP server runs via `docker run`
+- **`GITHUB_TOKEN`** — must be set in your environment; the MCP server uses it to read team specs, compute CIDRs, look up users, and open pull requests on your behalf
+
+```bash
+export GITHUB_TOKEN=<your-token>
+```
+
+Without `GITHUB_TOKEN`, read tools return `not_configured` and write tools (PR creation) will not work.
+
 ## Plugins vs instructions
 
 Plugins **complement** custom instructions — they do not replace them. The Copilot CLI `plugin.json` manifest has no field for custom instructions, so `copilot-instructions.md` and `*.instructions.md` remain distributed through [`pt-ai-context`](https://github.com/osinfra-io/pt-ai-context) and `COPILOT_CUSTOM_INSTRUCTIONS_DIRS`. Use this marketplace for cross-cutting **capabilities** (skills, agents, MCP servers) that should be installable from any directory.
