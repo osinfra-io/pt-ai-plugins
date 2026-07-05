@@ -126,7 +126,7 @@ git commit -m "Update plugins to latest releases" \
 git push -u origin update-plugins-YYYYMMDD
 gh pr create \
   --title "Update plugins to latest releases" \
-  --body "$(printf 'Bumps federated plugins to their latest releases:\n\n- nomos-agent: vA.B.C (pt-techne-mcp-server vX.Y.Z)')"
+  --body "$(printf 'Bumps federated plugins to their latest releases:\n\n- techne-agents: vA.B.C (pt-techne-mcp-server vX.Y.Z)')"
 gh pr edit --add-label chore
 gh pr merge --squash --delete-branch --auto
 ```

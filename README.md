@@ -11,7 +11,7 @@ Register the marketplace once, then install the plugins you want:
 ```bash
 copilot plugin marketplace add osinfra-io/pt-ai-plugins
 copilot plugin install platform-conventions@osinfra-io
-copilot plugin install nomos-agent@osinfra-io
+copilot plugin install techne-agents@osinfra-io
 ```
 
 Browse everything available in the marketplace:
@@ -25,11 +25,11 @@ copilot plugin marketplace browse osinfra-io
 | Plugin | Description | Source |
 | --- | --- | --- |
 | [platform-conventions](plugins/platform-conventions) | Shared platform workflows as Copilot skills (e.g. `create-pull-request`, `address-review-comments`) | this repo |
-| [nomos-agent](https://github.com/osinfra-io/pt-techne-agents) | The Nomos onboarding agent and its `pt-techne-mcp-server` tools | federated from `pt-techne-agents` |
+| [techne-agents](https://github.com/osinfra-io/pt-techne-agents) | The Nomos onboarding agent and its `pt-techne-mcp-server` tools | federated from `pt-techne-agents` |
 
-### nomos-agent requirements
+### techne-agents requirements
 
-The `nomos-agent` plugin runs the `pt-techne-mcp-server` as a Docker container. It requires:
+The `techne-agents` plugin runs the `pt-techne-mcp-server` as a Docker container. It requires:
 
 - **Docker** — the MCP server runs via `docker run`
 - **`NOMOS_GITHUB_TOKEN`** — must be set in your environment; the MCP server uses it to read team specs, compute CIDRs, look up users, and open pull requests on your behalf
@@ -45,7 +45,7 @@ Without `NOMOS_GITHUB_TOKEN`, read tools return `not_configured` and write tools
 Keep installed plugins current when new versions are released:
 
 ```bash
-copilot plugin update nomos-agent@osinfra-io
+copilot plugin update techne-agents@osinfra-io
 copilot plugin update platform-conventions@osinfra-io
 
 # or update everything at once
