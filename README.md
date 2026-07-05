@@ -40,6 +40,18 @@ export NOMOS_GITHUB_TOKEN=<your-token>
 
 Without `NOMOS_GITHUB_TOKEN`, read tools return `not_configured` and write tools (PR creation) will not work.
 
+## Updating
+
+Keep installed plugins current when new versions are released:
+
+```bash
+copilot plugin update nomos-agent@osinfra-io
+copilot plugin update platform-conventions@osinfra-io
+
+# or update everything at once
+copilot plugin update --all
+```
+
 ## Plugins vs instructions
 
 Plugins **complement** custom instructions — they do not replace them. The Copilot CLI `plugin.json` manifest has no field for custom instructions, so `copilot-instructions.md` and `*.instructions.md` remain distributed through [`pt-ai-context`](https://github.com/osinfra-io/pt-ai-context) and `COPILOT_CUSTOM_INSTRUCTIONS_DIRS`. Use this marketplace for cross-cutting **capabilities** (skills, agents, MCP servers) that should be installable from any directory.
