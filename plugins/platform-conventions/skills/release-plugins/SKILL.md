@@ -13,7 +13,7 @@ Federated plugins in `pt-ai-plugins` have upstream source repos. Changes must pr
 
 Current chain:
 
-```
+```text
 pt-techne-mcp-server  →  pt-techne-agents  →  pt-ai-plugins
 ```
 
@@ -24,11 +24,11 @@ For each repo in the chain, get the latest release and compare its publish date 
 ```bash
 gh release view --repo osinfra-io/pt-techne-mcp-server --json tagName,publishedAt
 gh pr list --repo osinfra-io/pt-techne-mcp-server --state merged \
-  --json number,title,mergedAt --limit 10
+  --json number,title,mergedAt
 
 gh release view --repo osinfra-io/pt-techne-agents --json tagName,publishedAt
 gh pr list --repo osinfra-io/pt-techne-agents --state merged \
-  --json number,title,mergedAt --limit 10
+  --json number,title,mergedAt
 ```
 
 A repo needs a new release if any PR merged **after** the latest release's `publishedAt`.
@@ -126,7 +126,7 @@ git commit -m "Update plugins to latest releases" \
 git push -u origin update-plugins-YYYYMMDD
 gh pr create \
   --title "Update plugins to latest releases" \
-  --body "$(echo 'Bumps federated plugins to their latest releases:\n\n- nomos-agent: vA.B.C (pt-techne-mcp-server vX.Y.Z)')"
+  --body "$(printf 'Bumps federated plugins to their latest releases:\n\n- nomos-agent: vA.B.C (pt-techne-mcp-server vX.Y.Z)')"
 gh pr edit --add-label chore
 gh pr merge --squash --delete-branch --auto
 ```
