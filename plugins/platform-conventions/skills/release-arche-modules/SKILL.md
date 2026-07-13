@@ -5,7 +5,7 @@ description: Walk the full pt-arche-* dependency chain in release order — dete
 
 # Release arche modules
 
-Execute the full arche module release chain autonomously. Do not pause between steps — work through the entire procedure and report a summary at the end.
+Execute the full arche module release chain autonomously. Do not pause between steps — work through the entire procedure and report a summary at the end. The one explicit exception is Step 4 (Tier 3), where user confirmation is required before updating consumers.
 
 ## Dependency chain
 
@@ -52,6 +52,8 @@ gh pr list --repo osinfra-io/pt-arche-datadog-google-integration --state merged 
 
 A repo needs a new release if any PR merged **after** the latest release's `publishedAt`.
 
+Additionally, after completing Step 2, check each Tier 2 module's `helpers.tofu` for its current `pt-arche-core-helpers` `ref=` SHA. Any module whose pin differs from the selected core SHA must be updated and released, even if it has no recently merged PRs.
+
 Determine the next version for each repo using [Semantic Versioning](https://semver.org/):
 
 - PATCH — bug fixes, dependency bumps, documentation tweaks
@@ -65,14 +67,14 @@ Get the current tip of `main` and tag it:
 ```bash
 cd pt-arche-core-helpers
 git fetch origin main
-git log origin/main --oneline -1
-git tag vX.Y.Z <sha>
+CORE_SHA=$(git rev-parse origin/main)
+git tag vX.Y.Z "$CORE_SHA"
 git push origin vX.Y.Z
 ```
 
-Record the post-merge SHA. This is the `<sha>` used in the tag command — it is the commit already on `main`, so no PR is needed.
+Record `$CORE_SHA` as the post-merge SHA. This is the commit already on `main`, so no PR is needed.
 
-If `pt-arche-core-helpers` does not need a release, use the SHA of its current `main` tip as the reference SHA for Tier 2 updates only if any Tier 2 module's `helpers.tofu` is not already pinned to that SHA.
+If `pt-arche-core-helpers` does not need a release, use the SHA of its current `main` tip as the reference SHA for Tier 2 updates.
 
 ## Step 3 — Release Tier 2 modules (parallel-safe)
 
@@ -101,7 +103,7 @@ pre-commit autoupdate --freeze && pre-commit run -a
 Commit, push, open PR, label, and squash-merge:
 
 ```bash
-git add helpers.tofu
+git add -A
 git commit -m "Update pt-arche-core-helpers to <core-version>" \
   -m "Co-authored-by: Copilot <223556219+Copilot@users.noreply.github.com>"
 git push -u origin update-core-helpers-to-<core-version>
@@ -116,8 +118,8 @@ Wait for the merge to complete, then fetch the post-merge SHA from `main` and ta
 
 ```bash
 git checkout main && git pull
-git log --oneline -1
-git tag vA.B.C <post-merge-sha>
+MODULE_SHA=$(git rev-parse HEAD)
+git tag vA.B.C "$MODULE_SHA"
 git push origin vA.B.C
 ```
 
@@ -155,7 +157,7 @@ Run pre-commit, commit, push, open PR, label, and squash-merge:
 
 ```bash
 pre-commit autoupdate --freeze && pre-commit run -a
-git add main.tofu helpers.tofu
+git add -A
 git commit -m "Update arche modules to latest releases" \
   -m "Co-authored-by: Copilot <223556219+Copilot@users.noreply.github.com>"
 git push -u origin update-arche-modules-YYYYMMDD
