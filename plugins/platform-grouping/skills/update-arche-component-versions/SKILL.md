@@ -106,7 +106,7 @@ gh pr create \
   --title "Update <component(s)> to <new-version(s)>" \
   --body "<Brief description of what changed. List each bumped variable and its old → new value.>"
 gh pr edit --add-label dependencies
-gh pr merge --squash --delete-branch --auto
+gh pr merge --squash --delete-branch --admin
 ```
 
 Wait for the merge to complete, then fetch the post-merge SHA from `main`:
