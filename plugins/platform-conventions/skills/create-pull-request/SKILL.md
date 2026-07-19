@@ -52,16 +52,23 @@ Use a **draft** PR (add `--draft`) for early feedback before the work is complet
 
 ## 5. Label the pull request
 
-Apply exactly one category label:
+Apply one or more labels that best describe what the PR touches:
 
 | Label | Use for |
 |---|---|
-| `bug` | A fix for incorrect behavior |
-| `chore` | Maintenance with no user-facing change |
-| `documentation` | Documentation-only changes |
-| `enhancement` | New capability or improvement |
-| `security` | Security fixes or hardening |
-| `tech-debt` | Refactoring or cleanup |
+| `actions` | GitHub Actions workflows and automation |
+| `copilot` | Copilot instructions, skills, hooks, and agents |
+| `dependencies` | Updates to a dependency file |
+| `devex` | Developer experience, tooling, and local environment |
+| `docker` | Docker images and container configuration |
+| `docs` | Docusaurus documentation site or other markdown documentation |
+| `kubernetes` | Kubernetes manifests, Helm charts, and cluster configuration |
+| `misc` | Miscellaneous work that does not fit another label |
+| `observability` | Observability, monitoring, and alerting |
+| `opentofu` | OpenTofu infrastructure code |
+| `scripts` | Generator and utility scripts |
+| `security` | Driven by security requirements or hardening |
+| `tests` | Test coverage, test infrastructure, and evaluations |
 
 ```bash
 gh pr edit --add-label <label>
