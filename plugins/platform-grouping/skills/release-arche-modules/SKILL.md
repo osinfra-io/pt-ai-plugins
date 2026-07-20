@@ -7,6 +7,8 @@ description: Walk the full pt-arche-* dependency chain in release order — dete
 
 Execute the full arche module release chain autonomously. Do not pause between steps — work through the entire procedure and report a summary at the end. The one explicit exception is Step 4 (Tier 3), where user confirmation is required before updating consumers.
 
+> **PR conventions:** branch naming, sentence-case titles, no Conventional Commits prefix, the `Co-authored-by` trailer, and the label taxonomy all follow the **create-pull-request** skill — that skill is the single source of truth for those mechanics. The commands below apply the release-specific titles and labels and merge autonomously (`--auto`), unlike the approval-gated flow in create-pull-request.
+
 ## Dependency chain
 
 ```text
@@ -80,6 +82,20 @@ If `pt-arche-core-helpers` does not need a release, use the SHA of its current `
 
 For each Tier 2 module that needs a release, execute the following steps. These modules are independent of each other and can be processed in any order (or in parallel).
 
+Each module has a **canonical** `helpers.tofu` — in several repos this is `shared/helpers.tofu`, and the `regional/` (and sibling subdirectory) copies are symlinks to it, so editing the canonical file updates them all. Edit only the canonical file listed below:
+
+| Repo | Canonical `helpers.tofu` | Notes |
+|---|---|---|
+| `pt-arche-datadog-google-integration` | `helpers.tofu` | Root-level file |
+| `pt-arche-google-cloud-sql` | `regional/helpers.tofu` | Only subdirectory |
+| `pt-arche-google-kubernetes-engine` | `shared/helpers.tofu` | `regional/` and `regional/onboarding/` are symlinks |
+| `pt-arche-google-network` | `shared/helpers.tofu` | `regional/` and `regional/nat/` are symlinks |
+| `pt-arche-google-project` | `helpers.tofu` | Root-level file |
+| `pt-arche-kubernetes-cert-manager` | `shared/helpers.tofu` | `regional/` and `regional/istio-csr/` are symlinks |
+| `pt-arche-kubernetes-datadog-operator` | `shared/helpers.tofu` | `regional/` and `regional/manifests/` are symlinks |
+| `pt-arche-kubernetes-istio` | `shared/helpers.tofu` | `regional/` and `regional/manifests/` are symlinks |
+| `pt-arche-kubernetes-opa-gatekeeper` | `shared/helpers.tofu` | `regional/` is a symlink |
+
 For each module, replace `<module>` with the repo name (e.g. `pt-arche-google-project`), `<core-sha>` with the 40-character post-merge SHA from Step 2, and `<core-version>` with the new `pt-arche-core-helpers` version tag:
 
 ```bash
@@ -88,7 +104,7 @@ git checkout main && git pull
 git checkout -b update-core-helpers-to-<core-version>
 ```
 
-Edit `helpers.tofu` — update the `ref=` value to the new core-helpers SHA and inline version comment:
+Edit the canonical `helpers.tofu` — update the `ref=` value to the new core-helpers SHA and inline version comment:
 
 ```hcl
 source = "github.com/osinfra-io/pt-arche-core-helpers//child?ref=<core-sha>"  # <core-version>
@@ -124,6 +140,18 @@ git push origin vA.B.C
 ```
 
 Record each module's post-merge SHA and new version tag for use in Step 4.
+
+### Also update pt-arche-child-module-template (no tag)
+
+After all Tier 2 modules are released, update the scaffold skeleton so newly created modules pin the current core-helpers version. This repo is not tagged.
+
+```bash
+cd pt-arche-child-module-template
+git checkout main && git pull
+git checkout -b update-core-helpers-to-<core-version>
+```
+
+Edit `skeleton/helpers.tofu` — update the `ref=` to `<core-sha>` and the inline version comment to `<core-version>`. Then run pre-commit, commit, push, open a PR labelled `chore`, and squash-merge (same commands as above). No release tag is needed for this repo.
 
 ## Step 4 — Update Tier 3 consumers (optional)
 

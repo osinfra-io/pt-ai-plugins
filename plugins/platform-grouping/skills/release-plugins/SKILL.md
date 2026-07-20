@@ -7,6 +7,8 @@ description: Check all osinfra-io Copilot CLI plugins for unreleased changes, cu
 
 Execute the full release chain autonomously. Do not pause to ask the user for confirmation between steps — work through the entire procedure and report a summary at the end.
 
+> **PR conventions:** branch naming, sentence-case titles, no Conventional Commits prefix, the `Co-authored-by` trailer, and the label taxonomy all follow the **create-pull-request** skill — that skill is the single source of truth for those mechanics. The commands below apply the release-specific titles and labels and merge autonomously (`--auto`), unlike the approval-gated flow in create-pull-request.
+
 ## Dependency chain
 
 Federated plugins in `pt-ai-plugins` have upstream source repos. Changes must propagate in dependency order before `pt-ai-plugins` can be updated.
