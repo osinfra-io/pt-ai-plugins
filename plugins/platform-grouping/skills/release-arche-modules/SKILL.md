@@ -7,6 +7,8 @@ description: Walk the full pt-arche-* dependency chain in release order — dete
 
 Execute the full arche module release chain autonomously. Do not pause between steps — work through the entire procedure and report a summary at the end. The one explicit exception is Step 4 (Tier 3), where user confirmation is required before updating consumers.
 
+> **PR conventions:** branch naming, sentence-case titles, no Conventional Commits prefix, the `Co-authored-by` trailer, and the label taxonomy all follow the **create-pull-request** skill — that skill is the single source of truth for those mechanics. The commands below apply the release-specific titles and labels and merge autonomously (`--auto`), unlike the approval-gated flow in create-pull-request.
+
 ## Dependency chain
 
 ```text
