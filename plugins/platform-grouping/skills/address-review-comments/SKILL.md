@@ -14,45 +14,21 @@ All code changes are committed together in **one commit** before any thread is r
 gh pr view --json number,headRefName,baseRefName
 ```
 
-Note the PR number and the `owner`/`repo` for the GraphQL calls below.
+Note the PR number and the `owner`/`repo` for the MCP tool calls below.
 
 ## 2. Fetch all unresolved review threads
 
-Use the GitHub GraphQL API to retrieve every review thread that is not yet resolved.
-`reviewThreads` is a paginated connection — loop with `after` until `hasNextPage` is `false`
-so no unresolved threads are missed on larger pull requests.
+Use the GitHub MCP server to retrieve all review threads:
 
-```bash
-gh api graphql --paginate -f query='
-  query($owner: String!, $repo: String!, $number: Int!, $after: String) {
-    repository(owner: $owner, name: $repo) {
-      pullRequest(number: $number) {
-        reviewThreads(first: 100, after: $after) {
-          pageInfo { hasNextPage endCursor }
-          nodes {
-            id
-            isResolved
-            path
-            line
-            comments(first: 10) {
-              nodes {
-                id
-                databaseId
-                body
-                author { login }
-              }
-            }
-          }
-        }
-      }
-    }
-  }
-' -f owner=OWNER -f repo=REPO -F number=PR_NUMBER
+```
+github-mcp-server-pull_request_read
+  method: get_review_comments
+  owner: <owner>
+  repo: <repo>
+  pullNumber: <number>
 ```
 
-The `--paginate` flag makes `gh` follow `endCursor` automatically until `hasNextPage` is
-`false`, collecting all pages into a single result. Filter the combined result to nodes where
-`isResolved` is `false`. Work only with those threads.
+The tool returns `review_threads` with `is_resolved`, `path`, `line`, `id` (thread node ID), and nested `comments` (each with `body`, `author`, `html_url`). Filter to threads where `is_resolved` is `false`. Work only with those threads.
 
 ## 3. Analyze every unresolved thread
 
@@ -87,15 +63,29 @@ git push
 - Write the message in **sentence case**, no Conventional Commits prefix.
 - If multiple unrelated areas were changed, list them briefly in the message body.
 
-## 6. Reply to each thread
+## 6. Reply and resolve each thread
 
-Post a reply to the first comment of each unresolved thread explaining what was done:
+For each unresolved thread, submit a review comment explaining what was done, then resolve:
 
-```bash
-gh api \
-  repos/OWNER/REPO/pulls/comments/COMMENT_DATABASE_ID/replies \
-  -X POST \
-  -f body="<reply text>"
+```
+github-mcp-server-pull_request_review_write
+  method: create
+  owner: <owner>
+  repo: <repo>
+  pullNumber: <number>
+  event: COMMENT
+  body: "<summary of fixes applied and dismissals explained>"
+```
+
+Then resolve each thread:
+
+```
+github-mcp-server-pull_request_review_write
+  method: resolve_thread
+  owner: <owner>
+  repo: <repo>
+  pullNumber: <number>
+  threadId: <thread node ID from step 2>
 ```
 
 Reply text guidelines:
@@ -103,18 +93,4 @@ Reply text guidelines:
 - **Fixed:** Describe what was changed and where (e.g. *"Fixed — removed the inline conditional from the module block and moved it to `locals.tofu` as `local.dns_name`."*)
 - **Dismissed:** Explain concisely why no change was made (e.g. *"No change needed — this output is already consumed by the `corpus` workspace via `module.core_helpers`."*)
 
-## 7. Resolve each thread
-
-After replying, resolve the thread using the GraphQL `resolveReviewThread` mutation:
-
-```bash
-gh api graphql -f query='
-  mutation($threadId: ID!) {
-    resolveReviewThread(input: { threadId: $threadId }) {
-      thread { id isResolved }
-    }
-  }
-' -f threadId=THREAD_NODE_ID
-```
-
-Repeat for every unresolved thread. All threads must be resolved by the end of this procedure.
+All threads must be resolved by the end of this procedure.
