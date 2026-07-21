@@ -45,10 +45,14 @@ Write the PR title in the same sentence-case style as the commit message, then o
 the GitHub CLI:
 
 ```bash
-gh pr create --title "<sentence-case title>" --body "<what changed and why>"
+gh pr create --draft --title "<sentence-case title>" --body "<what changed and why>"
 ```
 
-Use a **draft** PR (add `--draft`) for early feedback before the work is complete.
+Always open PRs as **draft**. When the user says "ready for review", mark it ready:
+
+```bash
+gh pr ready
+```
 
 ## 5. Label the pull request
 
