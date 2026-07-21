@@ -5,7 +5,7 @@
   },
   "metadata": {
     "description": "osinfra-io platform Copilot CLI plugins",
-    "version": "0.1.11"
+    "version": "0.1.12"
   },
   "plugins": [
     {
@@ -17,11 +17,11 @@
     {
       "name": "techne-agents",
       "description": "Self-serve osinfra-io platform onboarding — the Nomos agent and its pt-techne-mcp-server tools.",
-      "version": "0.2.1",
+      "version": "0.2.2",
       "source": {
         "source": "github",
         "repo": "osinfra-io/pt-techne-agents",
-        "ref": "v0.2.1"
+        "ref": "v0.2.2"
       }
     }
   ]
