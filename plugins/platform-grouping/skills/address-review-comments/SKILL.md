@@ -65,19 +65,20 @@ git push
 
 ## 6. Reply and resolve each thread
 
-For each unresolved thread, submit a review comment explaining what was done, then resolve:
+For each unresolved thread, reply **directly on the thread** (not as a new top-level review comment), then resolve it.
+
+Extract the numeric comment ID from the first comment's `html_url` (the number after `#discussion_r`), then reply:
 
 ```
-github-mcp-server-pull_request_review_write
-  method: create
+github-mcp-server-add_reply_to_pull_request_comment
   owner: <owner>
   repo: <repo>
   pullNumber: <number>
-  event: COMMENT
-  body: "<summary of fixes applied and dismissals explained>"
+  commentId: <numeric ID from html_url, e.g. 3652652800>
+  body: "<explanation of what was done>"
 ```
 
-Then resolve each thread:
+Then resolve the thread:
 
 ```
 github-mcp-server-pull_request_review_write
