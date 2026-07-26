@@ -95,11 +95,34 @@ git push origin vA.B.C
 
 **When only agent changes are unreleased** (no MCP server bump needed):
 
+Bump the `version` field in `plugin.json` to the next semver, commit, merge, then tag:
+
 ```bash
 cd pt-techne-agents
-git fetch origin main
-git log origin/main --oneline -1
-git tag vA.B.C <sha>
+git checkout main && git pull
+git checkout -b bump-version-vA.B.C
+```
+
+Edit `plugin.json` — set `"version": "A.B.C"`.
+
+```bash
+git add plugin.json
+git commit -m "Bump version to vA.B.C" \
+  -m "Co-authored-by: Copilot <223556219+Copilot@users.noreply.github.com>"
+git push -u origin bump-version-vA.B.C
+gh pr create \
+  --title "Bump version to vA.B.C" \
+  --body "Bumps plugin.json version for the next release."
+gh pr edit --add-label chore
+gh pr merge --squash --delete-branch --admin
+```
+
+Then fetch and tag:
+
+```bash
+git checkout main && git pull
+git log --oneline -1
+git tag vA.B.C
 git push origin vA.B.C
 ```
 
@@ -111,7 +134,7 @@ Read the current marketplace to identify which plugins need their `ref` or `vers
 cat .github/plugin/marketplace.json
 ```
 
-For each federated plugin with a new upstream release, update its `ref` and `version`. Also increment the top-level marketplace `version` (patch bump).
+For each federated plugin with a new upstream release, update its `ref` and `version`. Also increment the top-level marketplace `version` (patch bump). Additionally, bump `plugins/platform-grouping/plugin.json` version if any platform-grouping skill content changed since the last release.
 
 ```bash
 cd pt-ai-plugins
