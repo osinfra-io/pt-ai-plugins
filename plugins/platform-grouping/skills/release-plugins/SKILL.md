@@ -25,17 +25,16 @@ For each repo in the chain, get the latest release and compare its publish date 
 
 ```bash
 gh release view --repo osinfra-io/pt-techne-mcp-server --json tagName,publishedAt
-gh pr list --repo osinfra-io/pt-techne-mcp-server --state merged \
-  --json number,title,mergedAt
+gh pr list --repo osinfra-io/pt-techne-mcp-server --state merged   --json number,title,mergedAt
 
 gh release view --repo osinfra-io/pt-techne-agents --json tagName,publishedAt
-gh pr list --repo osinfra-io/pt-techne-agents --state merged \
-  --json number,title,mergedAt
+gh pr list --repo osinfra-io/pt-techne-agents --state merged   --json number,title,mergedAt
 ```
 
 A repo needs a new release if any PR merged **after** the latest release's `publishedAt`.
 
 Determine the next version for each repo using [Semantic Versioning](https://semver.org/):
+
 - PATCH — bug fixes, dependency bumps, prompt tweaks
 - MINOR — new tools, new schema fields, new agent capabilities
 - MAJOR — breaking changes to the API or schema
@@ -54,32 +53,31 @@ git push origin vX.Y.Z
 
 ## Step 3 — Release pt-techne-agents (if needed)
 
-If a new `pt-techne-mcp-server` was released in step 2, the agents repo must pin the new image tag before releasing. If only agent prompt changes are unreleased, skip straight to tagging.
+If a new `pt-techne-mcp-server` was released in Step 2, update the pinned image tag in `.mcp.json` before releasing the agents repo. If no MCP server bump is needed, skip that edit and release only the plugin version.
 
-**When the MCP server version changed:**
+In all cases, `pt-techne-agents` uses the same release flow: optionally edit `.mcp.json`, always bump the `version` field in `plugin.json` to the next semver, then commit, merge, and tag.
 
 ```bash
 cd pt-techne-agents
 git checkout main && git pull
-git checkout -b update-mcp-server-to-vX.Y.Z
+git checkout -b release-vA.B.C
 ```
 
-Edit `.mcp.json` — replace the image tag:
+If the MCP server version changed, edit `.mcp.json` and replace the image tag:
 
 ```json
 "ghcr.io/osinfra-io/pt-techne-mcp-server:vX.Y.Z"
 ```
 
-Bump the `version` field in `plugin.json` to the next semver.
+Always edit `plugin.json` and set `"version": "A.B.C"`.
+
+Commit the changed file set (`plugin.json` plus `.mcp.json` when applicable), push, open the PR, label it, and squash-merge:
 
 ```bash
-git add .mcp.json plugin.json
-git commit -m "Update pt-techne-mcp-server to vX.Y.Z" \
-  -m "Co-authored-by: Copilot <223556219+Copilot@users.noreply.github.com>"
-git push -u origin update-mcp-server-to-vX.Y.Z
-gh pr create \
-  --title "Update pt-techne-mcp-server to vX.Y.Z" \
-  --body "Bumps the MCP server Docker image to vX.Y.Z."
+git add plugin.json .mcp.json
+git commit -m "Release vA.B.C"   -m "Co-authored-by: Copilot <223556219+Copilot@users.noreply.github.com>"
+git push -u origin release-vA.B.C
+gh pr create   --title "Release vA.B.C"   --body "Bumps plugin.json for the next release and updates the pt-techne-mcp-server image tag to vX.Y.Z when required."
 gh pr edit --add-label chore
 gh pr merge --squash --delete-branch --auto
 ```
@@ -93,46 +91,9 @@ git tag vA.B.C
 git push origin vA.B.C
 ```
 
-**When only agent changes are unreleased** (no MCP server bump needed):
-
-Bump the `version` field in `plugin.json` to the next semver, commit, merge, then tag:
-
-```bash
-cd pt-techne-agents
-git checkout main && git pull
-git checkout -b bump-version-vA.B.C
-```
-
-Edit `plugin.json` — set `"version": "A.B.C"`.
-
-```bash
-git add plugin.json
-git commit -m "Bump version to vA.B.C" \
-  -m "Co-authored-by: Copilot <223556219+Copilot@users.noreply.github.com>"
-git push -u origin bump-version-vA.B.C
-gh pr create \
-  --title "Bump version to vA.B.C" \
-  --body "Bumps plugin.json version for the next release."
-gh pr edit --add-label chore
-gh pr merge --squash --delete-branch --admin
-```
-
-Then fetch and tag:
-
-```bash
-git checkout main && git pull
-git log --oneline -1
-git tag vA.B.C
-git push origin vA.B.C
-```
-
 ## Step 4 — Update pt-ai-plugins
 
-Read the current marketplace to identify which plugins need their `ref` or `version` bumped:
-
-```bash
-cat .github/plugin/marketplace.json
-```
+Read `.github/plugin/marketplace.json` directly to identify which plugins need their `ref` or `version` bumped.
 
 For each federated plugin with a new upstream release, update its `ref` and `version`. Also increment the top-level marketplace `version` (patch bump). Additionally, bump `plugins/platform-grouping/plugin.json` version if any platform-grouping skill content changed since the last release.
 
@@ -146,12 +107,11 @@ Edit `.github/plugin/marketplace.json` with the new refs and versions.
 
 ```bash
 git add .github/plugin/marketplace.json
-git commit -m "Update plugins to latest releases" \
-  -m "Co-authored-by: Copilot <223556219+Copilot@users.noreply.github.com>"
+git commit -m "Update plugins to latest releases"   -m "Co-authored-by: Copilot <223556219+Copilot@users.noreply.github.com>"
 git push -u origin update-plugins-YYYYMMDD
-gh pr create \
-  --title "Update plugins to latest releases" \
-  --body "$(printf 'Bumps federated plugins to their latest releases:\n\n- techne-agents: vA.B.C (pt-techne-mcp-server vX.Y.Z)')"
+gh pr create   --title "Update plugins to latest releases"   --body "Bumps federated plugins to their latest releases.
+
+- techne-agents: vA.B.C (pt-techne-mcp-server vX.Y.Z)"
 gh pr edit --add-label chore
 gh pr merge --squash --delete-branch --auto
 ```
@@ -170,7 +130,7 @@ git push origin vN.N.N
 Summarise what was done:
 
 | Repo | Previous | New |
-|---|---|---|
+| --- | --- | --- |
 | pt-techne-mcp-server | vOLD | vNEW |
 | pt-techne-agents | vOLD | vNEW |
 | pt-ai-plugins | vOLD | vNEW |
