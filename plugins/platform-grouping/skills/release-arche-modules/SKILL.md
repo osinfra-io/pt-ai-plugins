@@ -33,8 +33,8 @@ Execute the full arche module release chain autonomously. Do not pause between s
 Use the same detection pair for every tagged repo in the inventory (Tier 1 and all Tier 2 repos):
 
 ```bash
-gh release view --repo osinfra-io/<repo> --json tagName,publishedAt
-gh pr list --repo osinfra-io/<repo> --state merged   --json number,title,mergedAt
+gh release view --repo osinfra-io/<repo> --json tagName,publishedAt --jq '{tagName, publishedAt}'
+gh pr list --repo osinfra-io/<repo> --state merged   --json number,title,mergedAt --jq '.[] | {number, mergedAt}'
 ```
 
 Run that template for:
@@ -90,6 +90,7 @@ Each module has a **canonical** `helpers.tofu` — in several repos this is `sha
 | `pt-arche-google-kubernetes-engine` | `shared/helpers.tofu` | `regional/` and `regional/onboarding/` are symlinks |
 | `pt-arche-google-network` | `shared/helpers.tofu` | `regional/` and `regional/nat/` are symlinks |
 | `pt-arche-google-project` | `helpers.tofu` | Root-level file |
+| `pt-arche-google-storage-bucket` | _(none)_ | Exception: this module has no `pt-arche-core-helpers` dependency — it takes `labels` as a plain input variable. It only needs a release when it has merged PRs; skip the `helpers.tofu` pin check for it. |
 | `pt-arche-kubernetes-cert-manager` | `shared/helpers.tofu` | `regional/` and `regional/istio-csr/` are symlinks |
 | `pt-arche-kubernetes-datadog-operator` | `shared/helpers.tofu` | `regional/` and `regional/manifests/` are symlinks |
 | `pt-arche-kubernetes-istio` | `shared/helpers.tofu` | `regional/` and `regional/manifests/` are symlinks |
@@ -108,6 +109,8 @@ If the module's `pt-arche-core-helpers` pin changed, edit the canonical `helpers
 ```hcl
 source = "github.com/osinfra-io/pt-arche-core-helpers//child?ref=<core-sha>"  # <core-version>
 ```
+
+**If the pin already matches `<core-sha>`** (the module needs releasing only because of merged PRs, with no `helpers.tofu` change), skip straight to tagging: there is nothing to commit or merge, so tag the current `main` tip directly as the next module release and skip the PR steps below.
 
 Run pre-commit before committing:
 
@@ -140,6 +143,10 @@ Record each module's post-merge SHA and new version tag for use in Step 4.
 ### Also update pt-arche-child-module-template (no tag)
 
 After all Tier 2 modules are released, update the scaffold skeleton so newly created modules pin the current core-helpers version:
+
+Check `skeleton/helpers.tofu` first. **If its `ref=` already matches `<core-sha>`**, the scaffold is already current — skip the PR entirely and report it as unchanged in Step 5. Do not open a PR or tag this repo in that case.
+
+Otherwise:
 
 ```bash
 cd pt-arche-child-module-template
@@ -198,7 +205,8 @@ Summarise what was done:
 | pt-arche-kubernetes-datadog-operator | vOLD | vNEW | #PR |
 | pt-arche-kubernetes-istio | vOLD | vNEW | #PR |
 | pt-arche-kubernetes-opa-gatekeeper | vOLD | vNEW | #PR |
+| pt-arche-child-module-template (scaffold) | vOLD-pin | vNEW-pin | #PR |
 | pt-corpus | vOLD | — (updated) | #PR |
 | pt-pneuma | vOLD | — (updated) | #PR |
 
-Include the PR URL for any PR that was opened. Mark rows skipped (no changes) with "–".
+Include the PR URL for any PR that was opened. Mark rows skipped (no changes) with "–". The scaffold row has no release tag — record its `helpers.tofu` pin change (or "–" if it was already current) instead of a version.

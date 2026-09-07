@@ -28,8 +28,10 @@ Each `pt-arche-kubernetes-*` module pins upstream component versions as variable
 Read the current pinned defaults from each module:
 
 ```bash
-grep 'default' arche/pt-arche-kubernetes-cert-manager/regional/variables.tofu   arche/pt-arche-kubernetes-cert-manager/regional/istio-csr/variables.tofu   arche/pt-arche-kubernetes-datadog-operator/regional/variables.tofu   arche/pt-arche-kubernetes-datadog-operator/regional/manifests/variables.tofu   arche/pt-arche-kubernetes-istio/regional/variables.tofu   arche/pt-arche-kubernetes-opa-gatekeeper/regional/variables.tofu
+grep -B3 'default' arche/pt-arche-kubernetes-cert-manager/regional/variables.tofu   arche/pt-arche-kubernetes-cert-manager/regional/istio-csr/variables.tofu   arche/pt-arche-kubernetes-datadog-operator/regional/variables.tofu   arche/pt-arche-kubernetes-datadog-operator/regional/manifests/variables.tofu   arche/pt-arche-kubernetes-istio/regional/variables.tofu   arche/pt-arche-kubernetes-opa-gatekeeper/regional/variables.tofu
 ```
+
+The `-B3` context includes each `variable "<name>" {` block header above its `default`, so `node_agent_tag` and `cluster_agent_tag` (which share a file) can still be told apart. Map each `Current` value in the report to the registry row whose `Variable` matches the block header, not just the file.
 
 Fetch the latest upstream release for each component:
 
@@ -40,12 +42,17 @@ gh release view --repo cert-manager/cert-manager --json tagName   --jq '.tagName
 # cert-manager istio-csr — strip leading 'v'
 gh release view --repo cert-manager/istio-csr --json tagName   --jq '.tagName | ltrimstr("v")'
 
-# Datadog Operator Helm chart — find latest datadog-operator-* tag and strip prefix
+# Datadog Operator Helm chart — find latest datadog-operator-* tag and strip prefix.
+# DataDog/helm-charts publishes releases for many charts, so the newest 30 releases can
+# be dominated by other charts. If the result is empty, increase --limit until a
+# datadog-operator-* tag is found rather than accepting no match.
 gh release list --repo DataDog/helm-charts --limit 30 --json tagName   --jq '[.[] | .tagName | select(startswith("datadog-operator-"))][0] | sub("^datadog-operator-"; "")'
 
 # Datadog Agent / Cluster Agent — no 'v' prefix in the tag or the variable
-# Use the latest stable release (exclude rc, beta, alpha tags)
-gh release list --repo DataDog/datadog-agent --limit 10 --json tagName,isPrerelease   --jq '[.[] | select(.isPrerelease == false)][0].tagName'
+# Use the latest stable release (exclude rc, beta, alpha tags). If no stable release
+# is found in the fetched window, increase --limit (or paginate with `gh release list
+# --limit 100`) rather than accepting an older/empty result.
+gh release list --repo DataDog/datadog-agent --limit 30 --json tagName,isPrerelease   --jq '[.[] | select(.isPrerelease == false)][0].tagName'
 
 # Istio — strip leading 'v' for the variable value
 gh release view --repo istio/istio --json tagName   --jq '.tagName | ltrimstr("v")'

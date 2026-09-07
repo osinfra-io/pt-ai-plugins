@@ -103,15 +103,16 @@ git checkout main && git pull
 git checkout -b update-plugins-YYYYMMDD
 ```
 
-Edit `.github/plugin/marketplace.json` with the new refs and versions.
+Edit `.github/plugin/marketplace.json` with the new refs and versions. If `plugins/platform-grouping/plugin.json` was also bumped, stage it alongside the marketplace file and mention its new version in the PR body — omit the `platform-grouping` bullet and the `plugin.json` path below when that file didn't change.
 
 ```bash
-git add .github/plugin/marketplace.json
+git add .github/plugin/marketplace.json plugins/platform-grouping/plugin.json
 git commit -m "Update plugins to latest releases"   -m "Co-authored-by: Copilot <223556219+Copilot@users.noreply.github.com>"
 git push -u origin update-plugins-YYYYMMDD
 gh pr create   --title "Update plugins to latest releases"   --body "Bumps federated plugins to their latest releases.
 
-- techne-agents: vA.B.C (pt-techne-mcp-server vX.Y.Z)"
+- techne-agents: vA.B.C (pt-techne-mcp-server vX.Y.Z)
+- platform-grouping: vD.E.F (skill content changed)"
 gh pr edit --add-label chore
 gh pr merge --squash --delete-branch --auto
 ```
