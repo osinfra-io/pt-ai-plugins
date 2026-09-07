@@ -43,16 +43,20 @@ gh release view --repo cert-manager/cert-manager --json tagName   --jq '.tagName
 gh release view --repo cert-manager/istio-csr --json tagName   --jq '.tagName | ltrimstr("v")'
 
 # Datadog Operator Helm chart — find latest datadog-operator-* tag and strip prefix.
-# DataDog/helm-charts publishes releases for many charts, so the newest 30 releases can
-# be dominated by other charts. If the result is empty, increase --limit until a
-# datadog-operator-* tag is found rather than accepting no match.
-gh release list --repo DataDog/helm-charts --limit 30 --json tagName   --jq '[.[] | .tagName | select(startswith("datadog-operator-"))][0] | sub("^datadog-operator-"; "")'
+# DataDog/helm-charts publishes releases for many charts, so datadog-operator-* tags can
+# be interleaved arbitrarily deep in the release history. Fetch a generous window
+# (--limit 100) up front, then explicitly sort the filtered matches by publishedAt
+# instead of trusting fetch order — this guarantees the newest match is picked even if
+# an older one appears earlier in the (still-truncated) window. If the result is empty,
+# increase --limit further rather than accepting no match.
+gh release list --repo DataDog/helm-charts --limit 100 --json tagName,publishedAt   --jq '[.[] | select(.tagName | startswith("datadog-operator-"))] | sort_by(.publishedAt) | reverse | .[0].tagName | sub("^datadog-operator-"; "")'
 
 # Datadog Agent / Cluster Agent — no 'v' prefix in the tag or the variable
-# Use the latest stable release (exclude rc, beta, alpha tags). If no stable release
-# is found in the fetched window, increase --limit (or paginate with `gh release list
-# --limit 100`) rather than accepting an older/empty result.
-gh release list --repo DataDog/datadog-agent --limit 30 --json tagName,isPrerelease   --jq '[.[] | select(.isPrerelease == false)][0].tagName'
+# Use the latest stable release (exclude rc, beta, alpha tags). Same fetch-then-sort
+# approach as above: a generous --limit plus an explicit sort_by(publishedAt) so a
+# stale match within the window can't be mistaken for the latest. If no stable release
+# is found, increase --limit further rather than accepting an older/empty result.
+gh release list --repo DataDog/datadog-agent --limit 100 --json tagName,publishedAt,isPrerelease   --jq '[.[] | select(.isPrerelease == false)] | sort_by(.publishedAt) | reverse | .[0].tagName'
 
 # Istio — strip leading 'v' for the variable value
 gh release view --repo istio/istio --json tagName   --jq '.tagName | ltrimstr("v")'
