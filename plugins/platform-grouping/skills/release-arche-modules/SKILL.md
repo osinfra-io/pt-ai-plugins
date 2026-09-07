@@ -9,48 +9,47 @@ Execute the full arche module release chain autonomously. Do not pause between s
 
 > **PR conventions:** branch naming, sentence-case titles, no Conventional Commits prefix, the `Co-authored-by` trailer, and the label taxonomy all follow the **create-pull-request** skill — that skill is the single source of truth for those mechanics. The commands below apply the release-specific titles and labels and merge autonomously (`--auto`), unlike the approval-gated flow in create-pull-request.
 
-## Dependency chain
+## Repo inventory
 
-```text
-pt-arche-core-helpers                      ← Tier 1 (must release first)
-    └── pt-arche-datadog-google-integration
-    └── pt-arche-google-cloud-sql
-    └── pt-arche-google-kubernetes-engine
-    └── pt-arche-google-network
-    └── pt-arche-google-project
-    └── pt-arche-google-storage-bucket
-    └── pt-arche-kubernetes-cert-manager
-    └── pt-arche-kubernetes-datadog-operator
-    └── pt-arche-kubernetes-istio
-    └── pt-arche-kubernetes-opa-gatekeeper  ← Tier 2 (parallel-safe, after Tier 1)
-        └── pt-corpus
-        └── pt-pneuma                       ← Tier 3 (consumers, optional)
-```
+| Tier | Repo | Rule in the chain |
+| --- | --- | --- |
+| 1 | `pt-arche-core-helpers` | Must be released first. Its post-merge `main` SHA is the reference SHA for Tier 2 updates. |
+| 2 | `pt-arche-datadog-google-integration` | Parallel-safe after Tier 1. Release if it has merged PRs after its latest release, or if its `pt-arche-core-helpers` pin must be updated. |
+| 2 | `pt-arche-google-cloud-sql` | Parallel-safe after Tier 1. Release if it has merged PRs after its latest release, or if its `pt-arche-core-helpers` pin must be updated. |
+| 2 | `pt-arche-google-kubernetes-engine` | Parallel-safe after Tier 1. Release if it has merged PRs after its latest release, or if its `pt-arche-core-helpers` pin must be updated. |
+| 2 | `pt-arche-google-network` | Parallel-safe after Tier 1. Release if it has merged PRs after its latest release, or if its `pt-arche-core-helpers` pin must be updated. |
+| 2 | `pt-arche-google-project` | Parallel-safe after Tier 1. Release if it has merged PRs after its latest release, or if its `pt-arche-core-helpers` pin must be updated. |
+| 2 | `pt-arche-google-storage-bucket` | Parallel-safe after Tier 1. Release if it has merged PRs after its latest release, or if its `pt-arche-core-helpers` pin must be updated. |
+| 2 | `pt-arche-kubernetes-cert-manager` | Parallel-safe after Tier 1. Release if it has merged PRs after its latest release, or if its `pt-arche-core-helpers` pin must be updated. |
+| 2 | `pt-arche-kubernetes-datadog-operator` | Parallel-safe after Tier 1. Release if it has merged PRs after its latest release, or if its `pt-arche-core-helpers` pin must be updated. |
+| 2 | `pt-arche-kubernetes-istio` | Parallel-safe after Tier 1. Release if it has merged PRs after its latest release, or if its `pt-arche-core-helpers` pin must be updated. |
+| 2 | `pt-arche-kubernetes-opa-gatekeeper` | Parallel-safe after Tier 1. Release if it has merged PRs after its latest release, or if its `pt-arche-core-helpers` pin must be updated. |
+| scaffold | `pt-arche-child-module-template` | After Tier 2 releases, update `skeleton/helpers.tofu` to the current `pt-arche-core-helpers` SHA and merge the PR. Do not tag this repo. |
+| 3 (optional) | `pt-corpus` | After confirmation, update changed Tier 2 module refs in `main.tofu` and the `pt-arche-core-helpers` ref in `helpers.tofu`. |
+| 3 (optional) | `pt-pneuma` | After confirmation, update changed Tier 2 module refs in `main.tofu` and the `pt-arche-core-helpers` ref in `helpers.tofu`. |
 
 ## Step 1 — Detect what needs releasing
 
-For each repo in the chain, get the latest release and compare its publish date against recently merged PRs:
+Use the same detection pair for every tagged repo in the inventory (Tier 1 and all Tier 2 repos):
 
 ```bash
-gh release view --repo osinfra-io/pt-arche-core-helpers --json tagName,publishedAt
-gh pr list --repo osinfra-io/pt-arche-core-helpers --state merged \
-  --json number,title,mergedAt
-
-gh release view --repo osinfra-io/pt-arche-datadog-google-integration --json tagName,publishedAt
-gh pr list --repo osinfra-io/pt-arche-datadog-google-integration --state merged \
-  --json number,title,mergedAt
-
-# Repeat for each remaining Tier 2 repo:
-# pt-arche-google-cloud-sql
-# pt-arche-google-kubernetes-engine
-# pt-arche-google-network
-# pt-arche-google-project
-# pt-arche-google-storage-bucket
-# pt-arche-kubernetes-cert-manager
-# pt-arche-kubernetes-datadog-operator
-# pt-arche-kubernetes-istio
-# pt-arche-kubernetes-opa-gatekeeper
+gh release view --repo osinfra-io/<repo> --json tagName,publishedAt --jq '{tagName, publishedAt}'
+gh pr list --repo osinfra-io/<repo> --state merged   --json number,title,mergedAt --jq '.[] | {number, mergedAt}'
 ```
+
+Run that template for:
+
+- `pt-arche-core-helpers`
+- `pt-arche-datadog-google-integration`
+- `pt-arche-google-cloud-sql`
+- `pt-arche-google-kubernetes-engine`
+- `pt-arche-google-network`
+- `pt-arche-google-project`
+- `pt-arche-google-storage-bucket`
+- `pt-arche-kubernetes-cert-manager`
+- `pt-arche-kubernetes-datadog-operator`
+- `pt-arche-kubernetes-istio`
+- `pt-arche-kubernetes-opa-gatekeeper`
 
 A repo needs a new release if any PR merged **after** the latest release's `publishedAt`.
 
@@ -80,23 +79,24 @@ If `pt-arche-core-helpers` does not need a release, use the SHA of its current `
 
 ## Step 3 — Release Tier 2 modules (parallel-safe)
 
-For each Tier 2 module that needs a release, execute the following steps. These modules are independent of each other and can be processed in any order (or in parallel).
+Each Tier 2 module follows the same loop. These modules are independent of each other and can be processed in any order (or in parallel).
 
 Each module has a **canonical** `helpers.tofu` — in several repos this is `shared/helpers.tofu`, and the `regional/` (and sibling subdirectory) copies are symlinks to it, so editing the canonical file updates them all. Edit only the canonical file listed below:
 
 | Repo | Canonical `helpers.tofu` | Notes |
-|---|---|---|
+| --- | --- | --- |
 | `pt-arche-datadog-google-integration` | `helpers.tofu` | Root-level file |
 | `pt-arche-google-cloud-sql` | `regional/helpers.tofu` | Only subdirectory |
 | `pt-arche-google-kubernetes-engine` | `shared/helpers.tofu` | `regional/` and `regional/onboarding/` are symlinks |
 | `pt-arche-google-network` | `shared/helpers.tofu` | `regional/` and `regional/nat/` are symlinks |
 | `pt-arche-google-project` | `helpers.tofu` | Root-level file |
+| `pt-arche-google-storage-bucket` | _(none)_ | Exception: this module has no `pt-arche-core-helpers` dependency — it takes `labels` as a plain input variable. It only needs a release when it has merged PRs; skip the `helpers.tofu` pin check for it. |
 | `pt-arche-kubernetes-cert-manager` | `shared/helpers.tofu` | `regional/` and `regional/istio-csr/` are symlinks |
 | `pt-arche-kubernetes-datadog-operator` | `shared/helpers.tofu` | `regional/` and `regional/manifests/` are symlinks |
 | `pt-arche-kubernetes-istio` | `shared/helpers.tofu` | `regional/` and `regional/manifests/` are symlinks |
 | `pt-arche-kubernetes-opa-gatekeeper` | `shared/helpers.tofu` | `regional/` is a symlink |
 
-For each module, replace `<module>` with the repo name (e.g. `pt-arche-google-project`), `<core-sha>` with the 40-character post-merge SHA from Step 2, and `<core-version>` with the new `pt-arche-core-helpers` version tag:
+For each Tier 2 module that needs a release, replace `<module>` with the repo name (for example `pt-arche-google-project`), `<core-sha>` with the 40-character post-merge SHA from Step 2, and `<core-version>` with the new `pt-arche-core-helpers` version tag:
 
 ```bash
 cd <module>
@@ -104,11 +104,13 @@ git checkout main && git pull
 git checkout -b update-core-helpers-to-<core-version>
 ```
 
-Edit the canonical `helpers.tofu` — update the `ref=` value to the new core-helpers SHA and inline version comment:
+If the module's `pt-arche-core-helpers` pin changed, edit the canonical `helpers.tofu` from the table above and update both the `ref=` value and inline version comment:
 
 ```hcl
 source = "github.com/osinfra-io/pt-arche-core-helpers//child?ref=<core-sha>"  # <core-version>
 ```
+
+**If the pin already matches `<core-sha>`** (the module needs releasing only because of merged PRs, with no `helpers.tofu` change), skip straight to tagging: there is nothing to commit or merge, so tag the current `main` tip directly as the next module release and skip the PR steps below.
 
 Run pre-commit before committing:
 
@@ -120,12 +122,9 @@ Commit, push, open PR, label, and squash-merge:
 
 ```bash
 git add -A
-git commit -m "Update pt-arche-core-helpers to <core-version>" \
-  -m "Co-authored-by: Copilot <223556219+Copilot@users.noreply.github.com>"
+git commit -m "Update pt-arche-core-helpers to <core-version>"   -m "Co-authored-by: Copilot <223556219+Copilot@users.noreply.github.com>"
 git push -u origin update-core-helpers-to-<core-version>
-gh pr create \
-  --title "Update pt-arche-core-helpers to <core-version>" \
-  --body "Bumps the pt-arche-core-helpers SHA pin to <core-version>."
+gh pr create   --title "Update pt-arche-core-helpers to <core-version>"   --body "Bumps the pt-arche-core-helpers SHA pin to <core-version>."
 gh pr edit --add-label chore
 gh pr merge --squash --delete-branch --auto
 ```
@@ -143,7 +142,11 @@ Record each module's post-merge SHA and new version tag for use in Step 4.
 
 ### Also update pt-arche-child-module-template (no tag)
 
-After all Tier 2 modules are released, update the scaffold skeleton so newly created modules pin the current core-helpers version. This repo is not tagged.
+After all Tier 2 modules are released, update the scaffold skeleton so newly created modules pin the current core-helpers version:
+
+Check `skeleton/helpers.tofu` first. **If its `ref=` already matches `<core-sha>`**, the scaffold is already current — skip the PR entirely and report it as unchanged in Step 5. Do not open a PR or tag this repo in that case.
+
+Otherwise:
 
 ```bash
 cd pt-arche-child-module-template
@@ -151,7 +154,7 @@ git checkout main && git pull
 git checkout -b update-core-helpers-to-<core-version>
 ```
 
-Edit `skeleton/helpers.tofu` — update the `ref=` to `<core-sha>` and the inline version comment to `<core-version>`. Then run pre-commit, commit, push, open a PR labelled `chore`, and squash-merge (same commands as above). No release tag is needed for this repo.
+Edit `skeleton/helpers.tofu` — update the `ref=` to `<core-sha>` and the inline version comment to `<core-version>`. Then run pre-commit, commit, push, open a PR labelled `chore`, and squash-merge using the same PR flow as the Tier 2 modules. No release tag is needed for this repo.
 
 ## Step 4 — Update Tier 3 consumers (optional)
 
@@ -159,51 +162,38 @@ Edit `skeleton/helpers.tofu` — update the `ref=` to `<core-sha>` and the inlin
 
 > Tier 2 modules have been released. Would you like me to also update the Tier 3 consumers (`pt-corpus` and `pt-pneuma`) with the new module SHAs?
 
-If the user confirms, proceed for each consumer. Both `pt-corpus` and `pt-pneuma` may reference Tier 2 modules in `main.tofu` and a core-helpers reference in `helpers.tofu`. Update all `ref=` values that have changed.
+If the user confirms, process each confirmed consumer with the same update loop. For each repo, update every changed Tier 2 `ref=` in `main.tofu` and update `helpers.tofu` if the `pt-arche-core-helpers` `ref=` changed.
 
-For `pt-corpus`:
+| Repo | Files to update | Branch template |
+| --- | --- | --- |
+| `pt-corpus` | `main.tofu`, `helpers.tofu` | `update-arche-modules-YYYYMMDD` |
+| `pt-pneuma` | `main.tofu`, `helpers.tofu` | `update-arche-modules-YYYYMMDD` |
+
+Use this template for each confirmed consumer:
 
 ```bash
-cd pt-corpus
+cd <consumer>
 git checkout main && git pull
 git checkout -b update-arche-modules-YYYYMMDD
-```
-
-In `main.tofu`, update every `ref=` for changed Tier 2 modules to their new post-merge SHAs and inline version comments:
-
-```hcl
-source = "github.com/osinfra-io/pt-arche-google-project?ref=<new-sha>"  # <new-version>
-```
-
-In `helpers.tofu`, if the `pt-arche-core-helpers` `ref=` has changed, update it:
-
-```hcl
-source = "github.com/osinfra-io/pt-arche-core-helpers//root?ref=<core-sha>"  # <core-version>
-```
-
-Run pre-commit, commit, push, open PR, label, and squash-merge:
-
-```bash
 pre-commit autoupdate --freeze && pre-commit run -a
 git add -A
-git commit -m "Update arche modules to latest releases" \
-  -m "Co-authored-by: Copilot <223556219+Copilot@users.noreply.github.com>"
+git commit -m "Update arche modules to latest releases"   -m "Co-authored-by: Copilot <223556219+Copilot@users.noreply.github.com>"
 git push -u origin update-arche-modules-YYYYMMDD
-gh pr create \
-  --title "Update arche modules to latest releases" \
-  --body "$(printf 'Bumps arche module SHA pins to their latest releases:\n\n- pt-arche-core-helpers: <core-version>\n- pt-arche-google-project: <version>\n...')"
+gh pr create   --title "Update arche modules to latest releases"   --body "Bumps arche module SHA pins to their latest releases:
+
+- pt-arche-core-helpers: <core-version>
+- pt-arche-google-project: <version>
+..."
 gh pr edit --add-label chore
 gh pr merge --squash --delete-branch --auto
 ```
-
-Repeat the same process for `pt-pneuma`, updating any modules it references.
 
 ## Step 5 — Report
 
 Summarise what was done:
 
 | Repo | Previous | New | PR |
-|---|---|---|---|
+| --- | --- | --- | --- |
 | pt-arche-core-helpers | vOLD | vNEW | — |
 | pt-arche-datadog-google-integration | vOLD | vNEW | #PR |
 | pt-arche-google-cloud-sql | vOLD | vNEW | #PR |
@@ -215,7 +205,8 @@ Summarise what was done:
 | pt-arche-kubernetes-datadog-operator | vOLD | vNEW | #PR |
 | pt-arche-kubernetes-istio | vOLD | vNEW | #PR |
 | pt-arche-kubernetes-opa-gatekeeper | vOLD | vNEW | #PR |
+| pt-arche-child-module-template (scaffold) | vOLD-pin | vNEW-pin | #PR |
 | pt-corpus | vOLD | — (updated) | #PR |
 | pt-pneuma | vOLD | — (updated) | #PR |
 
-Include the PR URL for any PR that was opened. Mark rows skipped (no changes) with "–".
+Include the PR URL for any PR that was opened. Mark rows skipped (no changes) with "–". The scaffold row has no release tag — record its `helpers.tofu` pin change (or "–" if it was already current) instead of a version.

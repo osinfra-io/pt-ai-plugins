@@ -11,17 +11,16 @@ Execute the full component version update autonomously. Do not pause between ste
 
 ## Version registry
 
-Each `pt-arche-kubernetes-*` module pins upstream component versions as variable defaults.
-This table is the source of truth for where each version lives and where to find the latest.
+Each `pt-arche-kubernetes-*` module pins upstream component versions as variable defaults. Use this registry as the source of truth for where each version lives and how to discover the latest release. After collecting the current pinned value and latest upstream value for each row, emit report rows in the shape `Module | Variable | Current | Latest | Needs update?` from the discovered values — do not maintain a second hand-filled comparison table.
 
 | Module | File | Variable | Upstream repo | Version format |
-|---|---|---|---|---|
+| --- | --- | --- | --- | --- |
 | pt-arche-kubernetes-cert-manager | `regional/variables.tofu` | `cert_manager_version` | `cert-manager/cert-manager` | GitHub tag `vX.Y.Z` → strip `v` → `X.Y.Z` |
 | pt-arche-kubernetes-cert-manager | `regional/istio-csr/variables.tofu` | `cert_manager_istio_csr_version` | `cert-manager/istio-csr` | GitHub tag `vX.Y.Z` → strip `v` → `X.Y.Z` |
 | pt-arche-kubernetes-datadog-operator | `regional/variables.tofu` | `operator_version` | `DataDog/helm-charts` | GitHub tag `datadog-operator-X.Y.Z` → strip prefix → `X.Y.Z` |
 | pt-arche-kubernetes-datadog-operator | `regional/manifests/variables.tofu` | `node_agent_tag` | `DataDog/datadog-agent` | GitHub tag `X.Y.Z` (no `v`) |
-| pt-arche-kubernetes-datadog-operator | `regional/manifests/variables.tofu` | `cluster_agent_tag` | same as `node_agent_tag` — always the same version |  |
-| pt-arche-kubernetes-istio | `regional/variables.tofu` | `istio_version` | `istio/istio` | GitHub tag `X.Y.Z` (no `v` prefix in variable) |
+| pt-arche-kubernetes-datadog-operator | `regional/manifests/variables.tofu` | `cluster_agent_tag` | same as `node_agent_tag` — always the same version | same as `node_agent_tag` |
+| pt-arche-kubernetes-istio | `regional/variables.tofu` | `istio_version` | `istio/istio` | GitHub tag `vX.Y.Z` → strip `v` → `X.Y.Z` |
 | pt-arche-kubernetes-opa-gatekeeper | `regional/variables.tofu` | `gatekeeper_version` | `open-policy-agent/gatekeeper` | GitHub tag `vX.Y.Z` (keep `v` in variable) |
 
 ## Step 1 — Detect current and latest versions
@@ -29,57 +28,50 @@ This table is the source of truth for where each version lives and where to find
 Read the current pinned defaults from each module:
 
 ```bash
-grep 'default' arche/pt-arche-kubernetes-cert-manager/regional/variables.tofu \
-  arche/pt-arche-kubernetes-cert-manager/regional/istio-csr/variables.tofu \
-  arche/pt-arche-kubernetes-datadog-operator/regional/variables.tofu \
-  arche/pt-arche-kubernetes-datadog-operator/regional/manifests/variables.tofu \
-  arche/pt-arche-kubernetes-istio/regional/variables.tofu \
-  arche/pt-arche-kubernetes-opa-gatekeeper/regional/variables.tofu
+grep -B3 'default' arche/pt-arche-kubernetes-cert-manager/regional/variables.tofu   arche/pt-arche-kubernetes-cert-manager/regional/istio-csr/variables.tofu   arche/pt-arche-kubernetes-datadog-operator/regional/variables.tofu   arche/pt-arche-kubernetes-datadog-operator/regional/manifests/variables.tofu   arche/pt-arche-kubernetes-istio/regional/variables.tofu   arche/pt-arche-kubernetes-opa-gatekeeper/regional/variables.tofu
 ```
+
+The `-B3` context includes each `variable "<name>" {` block header above its `default`, so `node_agent_tag` and `cluster_agent_tag` (which share a file) can still be told apart. Map each `Current` value in the report to the registry row whose `Variable` matches the block header, not just the file.
 
 Fetch the latest upstream release for each component:
 
 ```bash
 # cert-manager — strip leading 'v'
-gh release view --repo cert-manager/cert-manager --json tagName
+gh release view --repo cert-manager/cert-manager --json tagName   --jq '.tagName | ltrimstr("v")'
 
 # cert-manager istio-csr — strip leading 'v'
-gh release view --repo cert-manager/istio-csr --json tagName
+gh release view --repo cert-manager/istio-csr --json tagName   --jq '.tagName | ltrimstr("v")'
 
-# Datadog Operator Helm chart — find latest datadog-operator-* tag and strip prefix
-gh release list --repo DataDog/helm-charts --limit 30 | grep '^datadog-operator'
+# Datadog Operator Helm chart — find latest datadog-operator-* tag and strip prefix.
+# DataDog/helm-charts publishes releases for many charts, so datadog-operator-* tags can
+# be interleaved arbitrarily deep in the release history. Fetch a generous window
+# (--limit 100) up front, then explicitly sort the filtered matches by publishedAt
+# instead of trusting fetch order — this guarantees the newest match is picked even if
+# an older one appears earlier in the (still-truncated) window. If the result is empty,
+# increase --limit further rather than accepting no match.
+gh release list --repo DataDog/helm-charts --limit 100 --json tagName,publishedAt   --jq '[.[] | select(.tagName | startswith("datadog-operator-"))] | sort_by(.publishedAt) | reverse | .[0].tagName | sub("^datadog-operator-"; "")'
 
 # Datadog Agent / Cluster Agent — no 'v' prefix in the tag or the variable
-# Use the latest stable release (exclude rc, beta, alpha tags)
-gh release list --repo DataDog/datadog-agent --limit 10 \
-  --json tagName,isPrerelease | jq '[.[] | select(.isPrerelease == false)][0]'
+# Use the latest stable release (exclude rc, beta, alpha tags). Same fetch-then-sort
+# approach as above: a generous --limit plus an explicit sort_by(publishedAt) so a
+# stale match within the window can't be mistaken for the latest. If no stable release
+# is found, increase --limit further rather than accepting an older/empty result.
+gh release list --repo DataDog/datadog-agent --limit 100 --json tagName,publishedAt,isPrerelease   --jq '[.[] | select(.isPrerelease == false)] | sort_by(.publishedAt) | reverse | .[0].tagName'
 
 # Istio — strip leading 'v' for the variable value
-gh release view --repo istio/istio --json tagName
+gh release view --repo istio/istio --json tagName   --jq '.tagName | ltrimstr("v")'
 
 # OPA Gatekeeper — keep the 'v' prefix in the variable value
-gh release view --repo open-policy-agent/gatekeeper --json tagName
+gh release view --repo open-policy-agent/gatekeeper --json tagName   --jq '.tagName'
 ```
 
-Build a comparison table:
-
-| Module | Variable | Current | Latest | Needs update? |
-|---|---|---|---|---|
-| pt-arche-kubernetes-cert-manager | `cert_manager_version` | X.Y.Z | X.Y.Z | yes/no |
-| pt-arche-kubernetes-cert-manager | `cert_manager_istio_csr_version` | X.Y.Z | X.Y.Z | yes/no |
-| pt-arche-kubernetes-datadog-operator | `operator_version` | X.Y.Z | X.Y.Z | yes/no |
-| pt-arche-kubernetes-datadog-operator | `node_agent_tag` | X.Y.Z | X.Y.Z | yes/no |
-| pt-arche-kubernetes-datadog-operator | `cluster_agent_tag` | X.Y.Z | X.Y.Z | yes/no |
-| pt-arche-kubernetes-istio | `istio_version` | X.Y.Z | X.Y.Z | yes/no |
-| pt-arche-kubernetes-opa-gatekeeper | `gatekeeper_version` | vX.Y.Z | vX.Y.Z | yes/no |
-
-If all versions are current, report the table and stop — nothing to do.
+If all versions are current, report the computed rows and stop — nothing to do.
 
 ## Step 2 — Update modules (one PR per repo)
 
 The four modules are independent and can be processed in any order. For each module that has at least one outdated version variable, follow the procedure below.
 
-Replace `<module>` with the repo name, `<component>` with a short description (e.g. `istio-1.30.1`), and `<new-version>` with the new version value.
+Replace `<module>` with the repo name, `<component>` with a short description (for example `istio-1.30.1`), and `<new-version>` with the new version value.
 
 ```bash
 cd arche/<module>
@@ -89,7 +81,7 @@ git checkout -b update-component-versions
 
 Edit the variable file(s) — update only the `default` value(s) that have changed. Do not touch any other lines.
 
-When multiple variables in the same repo need updating (e.g. both `node_agent_tag` and `cluster_agent_tag` in `pt-arche-kubernetes-datadog-operator`), update all of them in the same branch and commit.
+When multiple variables in the same repo need updating (for example both `node_agent_tag` and `cluster_agent_tag` in `pt-arche-kubernetes-datadog-operator`), update all of them in the same branch and commit.
 
 Run pre-commit before committing:
 
@@ -101,12 +93,9 @@ Commit, push, open PR, label, and squash-merge:
 
 ```bash
 git add -A
-git commit -m "Update <component(s)> to <new-version(s)>" \
-  -m "Co-authored-by: Copilot <223556219+Copilot@users.noreply.github.com>"
+git commit -m "Update <component(s)> to <new-version(s)>"   -m "Co-authored-by: Copilot <223556219+Copilot@users.noreply.github.com>"
 git push -u origin update-component-versions
-gh pr create \
-  --title "Update <component(s)> to <new-version(s)>" \
-  --body "<Brief description of what changed. List each bumped variable and its old → new value.>"
+gh pr create   --title "Update <component(s)> to <new-version(s)>"   --body "<Brief description of what changed. List each bumped variable and its old → new value.>"
 gh pr edit --add-label dependencies
 gh pr merge --squash --delete-branch --admin
 ```
@@ -124,6 +113,7 @@ Both `cert_manager_version` (in `regional/`) and `cert_manager_istio_csr_version
 
 **pt-arche-kubernetes-datadog-operator**
 Three variables across two files:
+
 - `regional/variables.tofu`: `operator_version`
 - `regional/manifests/variables.tofu`: `node_agent_tag` and `cluster_agent_tag`
 
@@ -151,7 +141,7 @@ The GitHub Actions release workflow generates release notes and publishes automa
 Summarise what was done:
 
 | Module | Variable(s) | Old version | New version | PR | Release |
-|---|---|---|---|---|---|
+| --- | --- | --- | --- | --- | --- |
 | pt-arche-kubernetes-cert-manager | `cert_manager_version` | OLD | NEW | #PR | vA.B.C |
 | pt-arche-kubernetes-cert-manager | `cert_manager_istio_csr_version` | OLD | NEW | #PR | vA.B.C |
 | pt-arche-kubernetes-datadog-operator | `operator_version` | OLD | NEW | #PR | vA.B.C |
