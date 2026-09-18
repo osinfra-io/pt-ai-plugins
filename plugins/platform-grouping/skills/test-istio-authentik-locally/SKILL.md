@@ -49,7 +49,7 @@ tofu -chdir=tests/docker/regional/config init
 tofu -chdir=tests/docker/regional/config apply -auto-approve
 ```
 
-If a command fails, inspect `docker compose ... ps` and `docker compose ... logs --tail=200 server worker postgresql`. Confirm Authentik health before continuing:
+If a command fails, inspect `docker compose --env-file tests/docker/.env --file tests/docker/compose.yml ps` and `docker compose --env-file tests/docker/.env --file tests/docker/compose.yml logs --tail=200 server worker postgresql`. Confirm Authentik health before continuing:
 
 ```bash
 curl --fail --insecure --silent --show-error https://127.0.0.1:9443/-/health/live/
