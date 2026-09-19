@@ -77,12 +77,23 @@ kubectl get gateway,httproute,authorizationpolicy --all-namespaces
 
 If setup fails, inspect the gateway, route, policy, pod, and recent proxy logs. Do not read or search `.terraform/` directories.
 
-## Verify forward authentication
+## Verify public bypasses
 
-Request the protected endpoint without following redirects:
+Request the public health and metadata endpoints without following redirects:
 
 ```bash
-curl --insecure --silent --show-error --dump-header - --output /dev/null https://dev.localhost/istio-test/health/basic
+curl --insecure --silent --show-error --dump-header - --output /dev/null https://dev.localhost/istio-test/health
+curl --insecure --silent --show-error --dump-header - --output /dev/null https://dev.localhost/istio-test/metadata/cluster-name
+```
+
+Require both responses to return `200` without a `Location` header pointing to Authentik. These endpoints are public diagnostics; an Authentik redirect means the public-path bypass is not working.
+
+## Verify forward authentication
+
+Request the protected identity diagnostic without following redirects:
+
+```bash
+curl --insecure --silent --show-error --dump-header - --output /dev/null https://dev.localhost/istio-test/auth
 ```
 
 Require all of the following:
@@ -94,7 +105,7 @@ Require all of the following:
 Then follow redirects to verify that the Authentik login flow is reachable:
 
 ```bash
-curl --insecure --location --silent --show-error --output /dev/null --write-out '%{http_code}\n' https://dev.localhost/istio-test/health/basic
+curl --insecure --location --silent --show-error --output /dev/null --write-out '%{http_code}\n' https://dev.localhost/istio-test/auth
 ```
 
 The final status must be `200`. A redirect to `http://localhost/` without port `9000` indicates that the embedded outpost's `authentik_host` is stale or unset.
@@ -104,7 +115,7 @@ The final status must be `200`. A redirect to `http://localhost/` without port `
 Tell the user to open:
 
 ```text
-https://dev.localhost/istio-test/health/basic
+https://dev.localhost/istio-test/auth
 ```
 
 They must accept the temporary self-signed certificate warning. Without Google credentials, use the committed local fixture account:
@@ -114,7 +125,7 @@ Username: akadmin
 Password: not-a-secret
 ```
 
-With Google credentials configured, select Google and authenticate with an allowed Workspace account. Success returns the `istio-test` health response. Do not claim interactive end-to-end success unless the browser callback has actually completed.
+With Google credentials configured, select Google and authenticate with an allowed Workspace account. Success returns a JSON diagnostic showing the trusted `x-authentik-*` identity headers that Authentik forwarded to the workload. Browser identity reaches the workload through these headers rather than a JWT. Do not claim interactive end-to-end success unless the browser callback has actually completed.
 
 ## Cleanup
 
