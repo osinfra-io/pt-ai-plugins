@@ -32,7 +32,7 @@ kubectl cluster-info
 
 Require a running Docker daemon and the `docker-desktop` Kubernetes context. Do not silently switch from another Kubernetes context; stop and explain the safety issue instead.
 
-The local test works with the committed bootstrap account and does not require Google credentials. To test Google sign-in, preserve existing `TF_VAR_google_oauth_client_id` and `TF_VAR_google_oauth_client_secret` values. Never print either value. The Google OAuth web client must allow this redirect URI:
+The interactive browser test uses Google sign-in. Preserve existing `TF_VAR_google_oauth_client_id` and `TF_VAR_google_oauth_client_secret` values; never print either value. If they are unavailable, stop after the HTTP redirect checks and report that interactive Google authentication cannot be completed. The Google OAuth web client must allow this redirect URI:
 
 ```text
 http://localhost:9000/source/oauth/callback/google/
@@ -118,14 +118,7 @@ Tell the user to open:
 https://dev.localhost/istio-test/auth
 ```
 
-They must accept the temporary self-signed certificate warning. Without Google credentials, use the committed local fixture account:
-
-```text
-Username: akadmin
-Password: not-a-secret
-```
-
-With Google credentials configured, select Google and authenticate with an allowed Workspace account. Success returns a JSON diagnostic showing the trusted `x-authentik-*` identity headers that Authentik forwarded to the workload. Browser identity reaches the workload through these headers rather than a JWT. Do not claim interactive end-to-end success unless the browser callback has actually completed.
+They must accept the temporary self-signed certificate warning. Select Google and authenticate with an allowed Workspace account. Success returns a JSON diagnostic showing the trusted `x-authentik-*` identity headers that Authentik forwarded to the workload. Browser identity reaches the workload through these headers rather than a JWT. Do not claim interactive end-to-end success unless the browser callback has actually completed.
 
 ## Cleanup
 
