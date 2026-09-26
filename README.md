@@ -24,8 +24,21 @@ copilot plugin marketplace browse osinfra-io
 
 | Plugin | Description | Source |
 | --- | --- | --- |
-| [platform-grouping](plugins/platform-grouping) | Shared platform workflows as Copilot skills (e.g. `create-pull-request`, `address-review-comments`) | this repo |
+| [platform-grouping](plugins/platform-grouping) | Shared release, review, testing, and pull-request skills | this repo |
 | [techne-agents](https://github.com/osinfra-io/pt-techne-agents) | The Nomos onboarding agent and its `pt-techne-mcp-server` tools | federated from `pt-techne-agents` |
+
+### Platform-grouping skills
+
+| Skill | Use it for |
+| --- | --- |
+| `address-review-comments` | Resolve all outstanding review threads on a pull request |
+| `create-pull-request` | Open a pull request using platform conventions |
+| `release-arche-modules` | Release the Arche dependency chain and update consumers |
+| `release-plugins` | Release plugins and synchronize marketplace metadata |
+| `test-istio-authentik-locally` | Exercise the local Istio and Authentik browser-authentication flow |
+| `update-arche-component-versions` | Update upstream Kubernetes component versions and release affected modules |
+
+Install `platform-grouping` for engineering workflows. Install `techne-agents` when you need the Nomos self-service platform interface.
 
 ### techne-agents requirements
 
