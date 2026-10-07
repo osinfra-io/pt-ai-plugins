@@ -40,7 +40,7 @@ Docker Desktop Kubernetes must use the **Kind** provisioner (Settings > Kubernet
 The interactive browser test uses Google sign-in. Preserve existing `TF_VAR_google_oauth_client_id` and `TF_VAR_google_oauth_client_secret` values; never print either value. If they are unavailable, stop after the HTTP redirect checks and report that interactive Google authentication cannot be completed. The Google OAuth web client must allow this redirect URI:
 
 ```text
-https://authentik.localhost/source/oauth/callback/google/
+https://localhost/source/oauth/callback/google/
 ```
 
 ## Start and configure Authentik
@@ -60,7 +60,7 @@ If a command fails, inspect `docker compose --env-file tests/docker/.env --file 
 curl --fail --insecure --silent --show-error https://127.0.0.1:9443/-/health/live/
 ```
 
-The fixture must configure the embedded outpost browser URL and brand domain as `https://authentik.localhost`; the OpenTofu provider still connects through `https://127.0.0.1:9443`. As in the platform, where Authentik is published on the shared Istio gateway at `authentik.<env>.osinfra.io`, the Istio fixture routes `authentik.localhost` through the gateway to the `authentik-server` Service, so the browser URL only works after the Istio fixture is installed. `http://localhost:9000` remains available for direct admin access.
+The fixture must configure the embedded outpost browser URL and brand domain as `https://authentik.localhost`; the OpenTofu provider still connects through `https://127.0.0.1:9443`. As in the platform, where Authentik is published on the shared Istio gateway at `authentik.<env>.osinfra.io`, the Istio fixture routes `authentik.localhost` through the gateway to the `authentik-server` Service, so the browser URL only works after the Istio fixture is installed. Google rejects `.localhost` subdomains as redirect URIs, so the gateway rewrites the Host of `/source/oauth/` requests on `authentik.localhost` to `localhost` (Authentik builds the callback from it) and a `localhost` listener redirects `/source/oauth/callback/` back to `authentik.localhost`, where the browser holds the session and OAuth state. A Google `Error 400: invalid_request` OAuth policy error means the callback still uses a `.localhost` subdomain. `http://localhost:9000` remains available for direct admin access.
 
 `AUTHENTIK_SECRET_KEY` must differ from `AUTHENTIK_BOOTSTRAP_TOKEN` in `tests/docker/.env`. The embedded outpost authenticates with the secret key, and if it matches an API token the request runs as `akadmin`, so `/api/v3/outposts/proxy/` returns `403` (`failed to fetch providers` in server logs) and every protected path returns `404`.
 
