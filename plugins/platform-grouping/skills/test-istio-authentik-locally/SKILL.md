@@ -40,7 +40,7 @@ Docker Desktop Kubernetes must use the **Kind** provisioner (Settings > Kubernet
 The interactive browser test uses Google sign-in. Preserve existing `TF_VAR_google_oauth_client_id` and `TF_VAR_google_oauth_client_secret` values; never print either value. If they are unavailable, stop after the HTTP redirect checks and report that interactive Google authentication cannot be completed. The Google OAuth web client must allow this redirect URI:
 
 ```text
-http://localhost:9000/source/oauth/callback/google/
+https://authentik.localhost/source/oauth/callback/google/
 ```
 
 ## Start and configure Authentik
@@ -60,7 +60,7 @@ If a command fails, inspect `docker compose --env-file tests/docker/.env --file 
 curl --fail --insecure --silent --show-error https://127.0.0.1:9443/-/health/live/
 ```
 
-The fixture must configure the embedded outpost browser URL as `http://localhost:9000`; the OpenTofu provider still connects through `https://127.0.0.1:9443`.
+The fixture must configure the embedded outpost browser URL and brand domain as `https://authentik.localhost`; the OpenTofu provider still connects through `https://127.0.0.1:9443`. As in the platform, where Authentik is published on the shared Istio gateway at `authentik.<env>.osinfra.io`, the Istio fixture routes `authentik.localhost` through the gateway to the `authentik-server` Service, so the browser URL only works after the Istio fixture is installed. `http://localhost:9000` remains available for direct admin access.
 
 `AUTHENTIK_SECRET_KEY` must differ from `AUTHENTIK_BOOTSTRAP_TOKEN` in `tests/docker/.env`. The embedded outpost authenticates with the secret key, and if it matches an API token the request runs as `akadmin`, so `/api/v3/outposts/proxy/` returns `403` (`failed to fetch providers` in server logs) and every protected path returns `404`.
 
@@ -117,7 +117,7 @@ curl --insecure --silent --show-error --dump-header - --output /dev/null https:/
 Require all of the following:
 
 - status `302`;
-- `Location` begins with `http://localhost:9000/application/o/authorize/`;
+- `Location` begins with `https://authentik.localhost/application/o/authorize/`;
 - the encoded callback points to `https://dev.localhost/outpost.goauthentik.io/callback`.
 
 Then follow redirects to verify that the Authentik login flow is reachable:
@@ -126,7 +126,7 @@ Then follow redirects to verify that the Authentik login flow is reachable:
 curl --insecure --location --silent --show-error --output /dev/null --write-out '%{http_code}\n' https://dev.localhost/istio-test/auth
 ```
 
-The final status must be `200`. A redirect to `http://localhost/` without port `9000` indicates that the embedded outpost's `authentik_host` is stale or unset.
+The final status must be `200`. A redirect to any host other than `authentik.localhost` indicates that the embedded outpost's `authentik_host` is stale or unset.
 
 ## Install and verify the AgentGateway layer
 
@@ -136,7 +136,7 @@ From `pt-arche-kubernetes-agentgateway`, after the Istio checks above pass:
 tests/docker/setup.sh
 ```
 
-The script pins the AgentGateway Helm charts (`AGENTGATEWAY_VERSION`), enrolls `agentgateway-system` in ambient mode, and applies the internal proxy `Gateway`, `AgentgatewayParameters`, ingress and backend `HTTPRoute`s, the `ReferenceGrant` in `istio-test`, an Authentik outpost route, and an Authentik `CUSTOM` `AuthorizationPolicy` for the `agentgateway.localhost` host. AgentGateway is served on `https://agentgateway.localhost` through the Istio gateway's `*.localhost` listener; the Istio test workload stays on `dev.localhost`. Keep Authentik at `http://localhost:9000`: Google OAuth restricts redirect URIs to `localhost`, loopback IPs, or public domains, so moving Authentik to `authentik.localhost` is expected to break Google sign-in. It fails unless the controller and proxy roll out, the proxy is ambient-enrolled with no `istio-proxy`, the Gateway is `Programmed`, both routes are `Accepted` and `ResolvedRefs`, `/agentgateway-test/health` and `/agentgateway-test/metadata/cluster-name` return `200`, `/agentgateway-test/auth` redirects to Authentik with a callback on `agentgateway.localhost`, with and without spoofed `X-Authentik-*` headers, the outpost path answers on `agentgateway.localhost`, and the admin UI at `/ui/` redirects to Authentik. On failure it prints Helm releases, CRDs, Gateway and route status, the `ReferenceGrant`, pods, controller/proxy logs, and ztunnel logs.
+The script pins the AgentGateway Helm charts (`AGENTGATEWAY_VERSION`), enrolls `agentgateway-system` in ambient mode, and applies the internal proxy `Gateway`, `AgentgatewayParameters`, ingress and backend `HTTPRoute`s, the `ReferenceGrant` in `istio-test`, an Authentik outpost route, and an Authentik `CUSTOM` `AuthorizationPolicy` for the `agentgateway.localhost` host. AgentGateway is served on `https://agentgateway.localhost` through the Istio gateway's `*.localhost` listener; the Istio test workload stays on `dev.localhost`. It fails unless the controller and proxy roll out, the proxy is ambient-enrolled with no `istio-proxy`, the Gateway is `Programmed`, both routes are `Accepted` and `ResolvedRefs`, `/agentgateway-test/health` and `/agentgateway-test/metadata/cluster-name` return `200`, `/agentgateway-test/auth` redirects to Authentik with a callback on `agentgateway.localhost`, with and without spoofed `X-Authentik-*` headers, the outpost path answers on `agentgateway.localhost`, and the admin UI at `/ui/` redirects to Authentik. On failure it prints Helm releases, CRDs, Gateway and route status, the `ReferenceGrant`, pods, controller/proxy logs, and ztunnel logs.
 
 Before changing the pinned version, resolve the latest stable release with `gh release list --repo agentgateway/agentgateway --exclude-pre-releases --limit 1`. Never downgrade Istio or select an older AgentGateway release to make the test pass; record an incompatibility as blocked with a minimal reproduction and an upstream issue instead.
 
