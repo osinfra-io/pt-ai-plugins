@@ -142,19 +142,14 @@ Before changing the pinned version, resolve the latest stable release with `gh r
 
 Confirm the in-mesh hops are mutual TLS through ztunnel. The proxy pools connections, so use ztunnel metrics rather than access logs:
 
-In one terminal, start the port-forward and wait for `Forwarding from`:
-
 ```bash
-kubectl port-forward --namespace=istio-system daemonset/ztunnel 15020:15020
-```
-
-In another terminal, query the metrics:
-
-```bash
+timeout 20 kubectl port-forward --namespace=istio-system daemonset/ztunnel 15020:15020 >/dev/null &
+sleep 3
 curl --silent http://localhost:15020/metrics | grep '^istio_tcp_connections_opened_total' | grep agentgateway-proxy
+wait
 ```
 
-Expect `connection_security_policy="mutual_tls"` series for `gateway-istio` -> `agentgateway-proxy` and `agentgateway-proxy` -> `istio-test`. Stop the port-forward with Ctrl+C afterwards. When executing through assistant tools, run the port-forward in an attached asynchronous shell, query from a separate shell after it reports readiness, and stop the forwarding shell after the check, including on failure.
+`kubectl port-forward` blocks until stopped, so run it in the background with a `timeout` and query the metrics while it is active. Expect `connection_security_policy="mutual_tls"` series for `gateway-istio` -> `agentgateway-proxy` and `agentgateway-proxy` -> `istio-test`.
 
 ## Identify the failing layer
 
