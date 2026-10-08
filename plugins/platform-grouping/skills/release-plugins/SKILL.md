@@ -7,7 +7,7 @@ description: Check all osinfra-io Copilot CLI plugins for unreleased changes, cu
 
 Execute the full release chain autonomously. Do not pause to ask the user for confirmation between steps — work through the entire procedure and report a summary at the end.
 
-> **PR conventions:** branch naming, sentence-case titles, no Conventional Commits prefix, the `Co-authored-by` trailer, and the label taxonomy all follow the **create-pull-request** skill — that skill is the single source of truth for those mechanics. The commands below apply the release-specific titles and labels and merge autonomously (`--auto`), unlike the approval-gated flow in create-pull-request.
+> **PR conventions:** branch naming, sentence-case titles, no Conventional Commits prefix, and the `Co-authored-by` trailer follow the **create-pull-request** skill. Before labeling a PR, inspect the target repository's existing labels with `gh label list --repo osinfra-io/<repo>`. Use an existing label that matches the change; use `copilot` for plugin or skill releases when available. Do not create a new label just to match an example. The commands below merge autonomously (`--auto`), unlike the approval-gated flow in create-pull-request. If branch rules block auto-merge because approval is required, leave auto-merge enabled and report the blocking requirement; do not bypass repository protections.
 
 ## Dependency chain
 
@@ -78,7 +78,8 @@ git add plugin.json .mcp.json
 git commit -m "Release vA.B.C"   -m "Co-authored-by: Copilot <223556219+Copilot@users.noreply.github.com>"
 git push -u origin release-vA.B.C
 gh pr create   --title "Release vA.B.C"   --body "Bumps plugin.json for the next release and updates the pt-techne-mcp-server image tag to vX.Y.Z when required."
-gh pr edit --add-label chore
+gh label list --repo osinfra-io/pt-techne-agents
+gh pr edit --add-label copilot
 gh pr merge --squash --delete-branch --auto
 ```
 
@@ -113,7 +114,8 @@ gh pr create   --title "Update plugins to latest releases"   --body "Bumps feder
 
 - techne-agents: vA.B.C (pt-techne-mcp-server vX.Y.Z)
 - platform-grouping: vD.E.F (skill content changed)"
-gh pr edit --add-label chore
+gh label list --repo osinfra-io/pt-ai-plugins
+gh pr edit --add-label copilot
 gh pr merge --squash --delete-branch --auto
 ```
 
