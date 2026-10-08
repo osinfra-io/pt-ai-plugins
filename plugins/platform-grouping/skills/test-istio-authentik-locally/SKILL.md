@@ -143,11 +143,13 @@ Before changing the pinned version, resolve the latest stable release with `gh r
 Confirm the in-mesh hops are mutual TLS through ztunnel. The proxy pools connections, so use ztunnel metrics rather than access logs:
 
 ```bash
-kubectl port-forward --namespace=istio-system daemonset/ztunnel 15020:15020
+timeout 20 kubectl port-forward --namespace=istio-system daemonset/ztunnel 15020:15020 >/dev/null &
+sleep 3
 curl --silent http://localhost:15020/metrics | grep '^istio_tcp_connections_opened_total' | grep agentgateway-proxy
+wait
 ```
 
-Expect `connection_security_policy="mutual_tls"` series for `gateway-istio` -> `agentgateway-proxy` and `agentgateway-proxy` -> `istio-test`. Stop the port-forward afterwards.
+`kubectl port-forward` blocks until stopped, so run it in the background with a `timeout` and query the metrics while it is active. Expect `connection_security_policy="mutual_tls"` series for `gateway-istio` -> `agentgateway-proxy` and `agentgateway-proxy` -> `istio-test`.
 
 ## Identify the failing layer
 
@@ -172,7 +174,9 @@ When the AgentGateway layer is installed, also open `https://agentgateway.localh
 
 ## Cleanup
 
-Only tear down when requested. If the AgentGateway layer is installed, first run from `pt-arche-kubernetes-agentgateway`:
+Only tear down when requested. The teardown scripts delete cluster-scoped Gateway API and AgentGateway CRDs, which also deletes every resource of those kinds. Run them only on a Docker Desktop cluster dedicated to these fixtures. If Gateway API or AgentGateway resources exist that these fixtures did not create, stop and explain the risk instead of tearing down.
+
+If the AgentGateway layer is installed, first run from `pt-arche-kubernetes-agentgateway`:
 
 ```bash
 tests/docker/teardown.sh
