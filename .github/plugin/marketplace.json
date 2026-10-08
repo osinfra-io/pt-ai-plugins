@@ -5,13 +5,13 @@
   },
   "metadata": {
     "description": "osinfra-io platform Copilot CLI plugins",
-    "version": "0.1.19"
+    "version": "0.1.20"
   },
   "plugins": [
     {
       "name": "platform-grouping",
       "description": "Shared osinfra-io platform workflows as Copilot skills.",
-      "version": "0.1.10",
+      "version": "0.1.11",
       "source": "./plugins/platform-grouping"
     },
     {
