@@ -2,8 +2,10 @@
 
 set -euo pipefail
 
-readonly SKILL_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
-readonly TEST_DIR="$(mktemp -d)"
+SKILL_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
+readonly SKILL_DIR
+TEST_DIR="$(mktemp -d)"
+readonly TEST_DIR
 trap 'rm -f "${TEST_DIR}/claimed" "${TEST_DIR}/output"; rmdir "${TEST_DIR}"' EXIT
 export CLAIM_FILE="${TEST_DIR}/claimed"
 
