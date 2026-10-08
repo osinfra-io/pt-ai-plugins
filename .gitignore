@@ -9,3 +9,6 @@
 *.gz
 *.tgz
 *.tar
+
+# Python verification helpers
+__pycache__/
