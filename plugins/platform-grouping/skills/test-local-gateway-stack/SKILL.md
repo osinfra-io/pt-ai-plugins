@@ -1,202 +1,176 @@
 ---
 name: test-local-gateway-stack
-description: Set up, test, debug, and tear down the local Authentik and Istio browser-authentication flow on an ambient-only Istio mesh with Docker Desktop Kubernetes (Kind provisioner). Optionally layers AgentGateway behind Istio. Use when asked to run or troubleshoot local Istio, Authentik, AgentGateway, forward-auth, ext_authz, or browser authentication tests in the osinfra-io platform repositories.
+description: Exercise checked-out Authentik, Istio ambient, and agentgateway configuration together in dedicated Docker Desktop Kind Kubernetes before optional sandbox deployment. Coordinates repo-owned tests/kubernetes fixtures and real Google browser sign-in.
 ---
 
 # Test the local gateway stack
 
-Execute the local browser-authentication test autonomously against an ambient-only mesh (`istiod`, `istio-cni`, `ztunnel`; no sidecars), matching production. Diagnose and fix setup failures rather than only printing commands. Stop before the interactive sign-in when no browser automation is available, report the exact URL to open, and leave the fixtures running unless the user asks for cleanup.
+This is an **opt-in developer integration test for complex configuration changes**, not a mandatory pre-push check or CI gate. Run the whole stack in Kubernetes, including Authentik and local PostgreSQL. Keep mocked OpenTofu tests separate.
+
+Use the component scripts directly; do not reimplement their deployment in ad-hoc Helm commands or test YAML. Diagnose failures explicitly and stop before destructive migration or interactive sign-in when those steps cannot be completed safely. Never report full integration success without observed Google sign-in and identity verification.
 
 ## Repository discovery
 
-Locate these checkouts without assuming the current directory:
+Locate these checkouts and read their repository/team instructions:
 
 - `pt-arche-kubernetes-authentik`
 - `pt-arche-kubernetes-istio`
+- `pt-arche-kubernetes-agentgateway`
 - `pt-pneuma-istio-test`
-- `pt-arche-kubernetes-agentgateway` (AgentGateway layer)
+- `pt-pneuma` for the shared gateway-auth renderer and Authentik authentication module
 
-In the aggregated `platform-group` workspace they are under `arche/`, `arche/`, `pneuma/`, and `arche/` respectively. Otherwise, search the current directory and its descendants while excluding `.terraform/`. Record absolute paths and run every command from the repository it belongs to.
+Use the aggregated workspace layout: module repositories under `arche/`, application/consumer repositories under `pneuma/`. The local module sources use this relative checkout arrangement to share the actual Pneuma renderer without unpublished release pins. Do not claim arbitrary sibling-clone layouts work; arrange the required checkouts in the standard layout first. Exclude `.terraform/` entirely. Record absolute paths and run each command in its owning repository.
 
-Run the AgentGateway layer whenever its checkout is found or the user asks about AgentGateway; set up in Authentik -> Istio -> AgentGateway order and clean up in reverse.
+All three components participate in a holistic run. Do not silently omit agentgateway because a checkout is missing. Fixtures live in `tests/kubernetes/`; generated credentials, state, and provider files live in ignored `.work/` directories. Relative module sources exercise the developer's checked-out changes. Do not use Docker Compose or maintain a parallel Compose fixture.
 
-Read each repository's `.github/copilot-instructions.md` and the Arche team instructions before changing files.
+## Prerequisites and ownership
 
-## Prerequisites
+Run `scripts/preflight.sh` relative to this skill directory. It checks Docker, the explicit `docker-desktop` context, Docker Desktop's **Kind** provisioner, ambient mount propagation, and fixture ownership.
 
-Verify before changing the running environment:
+On a fresh **dedicated** test cluster, run `scripts/preflight.sh --claim` to record ownership. It refuses existing namespaces, Helm installations, or gateway/mesh CRDs without an ownership record. Component scripts also require their own state. A context name or matching resource name does not establish ownership.
 
-```bash
-command -v curl docker helm kubectl openssl tofu
-docker info
-kubectl config current-context
-kubectl cluster-info
+Do not silently change contexts, adopt existing resources, uninstall existing installations, purge CRDs, or reset Docker Desktop Kubernetes. If the cluster contains unowned resources, report that explicit adoption is required; do not fabricate local state or add an ownership marker to bypass the guard.
+
+Allocate sufficient CPU/memory for the existing ambient and application workloads. Never fall back to sidecars to make the tests pass.
+
+Real Google authentication requires both environment variables:
+
+```text
+TF_VAR_google_oauth_client_id
+TF_VAR_google_oauth_client_secret
 ```
 
-Require a running Docker daemon and the `docker-desktop` Kubernetes context. Do not silently switch from another Kubernetes context; stop and explain the safety issue instead.
-
-Docker Desktop Kubernetes must use the **Kind** provisioner (Settings > Kubernetes > Cluster provisioning method), allocated at least 4 CPUs and 8 GB of memory. The legacy **kubeadm** provisioner runs Kubernetes in Docker Desktop's VM, whose root mount is not shared, so the ambient `istio-cni` agent fails with `path /var/run/netns is mounted on /run but it is not a shared or slave mount` ([docker/desktop-feedback#629](https://github.com/docker/desktop-feedback/issues/629), [istio/istio#47436](https://github.com/istio/istio/issues/47436)). Kind nodes run as containers with shared mount propagation, so ambient works there. `tests/docker/setup.sh` rejects non-Kind nodes and unsuitable mount propagation; if it does, tell the user to switch the provisioner rather than falling back to sidecar mode.
-
-The interactive browser test uses Google sign-in. Preserve existing `TF_VAR_google_oauth_client_id` and `TF_VAR_google_oauth_client_secret` values; never print either value. If they are unavailable, stop after the HTTP redirect checks and report that interactive Google authentication cannot be completed. The Google OAuth web client must allow this redirect URI:
+Never print their values, persist them in tracked files, or log tokens, cookies, callback codes, or identity JSON. The Google web client must allow:
 
 ```text
 https://localhost/source/oauth/callback/google/
 ```
 
-## Start and configure Authentik
+The gateway rewrites Google source requests to the `localhost` Host and returns the callback to `authentik.localhost`, where the session is held. Keep this contract; Google does not accept `.localhost` subdomains as redirect URIs.
 
-From `pt-arche-kubernetes-authentik`:
+## Setup and iteration
 
-```bash
-docker compose --env-file tests/docker/.env --file tests/docker/compose.yml up --detach
-tests/docker/wait-for-authentik.sh
-tofu -chdir=tests/docker/regional/config init
-tofu -chdir=tests/docker/regional/config apply -auto-approve
-```
+The dependency order is:
 
-If a command fails, inspect `docker compose --env-file tests/docker/.env --file tests/docker/compose.yml ps` and `docker compose --env-file tests/docker/.env --file tests/docker/compose.yml logs --tail=200 server worker postgresql`. Confirm Authentik health before continuing:
+1. Gateway API CRDs and Istio ambient runtime.
+2. Kubernetes PostgreSQL and Authentik runtime/configuration.
+3. Shared ingress routing/auth policy and diagnostic workload.
+4. Agentgateway deployment and its later CRD-dependent manifests.
 
-```bash
-curl --fail --insecure --silent --show-error https://127.0.0.1:9443/-/health/live/
-```
-
-The fixture must configure the embedded outpost browser URL and brand domain as `https://authentik.localhost`; the OpenTofu provider still connects through `https://127.0.0.1:9443`. As in the platform, where Authentik is published on the shared Istio gateway at `authentik.<env>.osinfra.io`, the Istio fixture routes `authentik.localhost` through the gateway to the `authentik-server` Service, so the browser URL only works after the Istio fixture is installed. Google rejects `.localhost` subdomains as redirect URIs, so the gateway rewrites the Host of `/source/oauth/` requests on `authentik.localhost` to `localhost` (Authentik builds the callback from it) and a `localhost` listener redirects `/source/oauth/callback/` back to `authentik.localhost`, where the browser holds the session and OAuth state. A Google `Error 400: invalid_request` OAuth policy error means the callback still uses a `.localhost` subdomain. `http://localhost:9000` remains available for direct admin access.
-
-`AUTHENTIK_SECRET_KEY` must differ from `AUTHENTIK_BOOTSTRAP_TOKEN` in `tests/docker/.env`. The embedded outpost authenticates with the secret key, and if it matches an API token the request runs as `akadmin`, so `/api/v3/outposts/proxy/` returns `403` (`failed to fetch providers` in server logs) and every protected path returns `404`.
-
-## Install the Istio fixture
-
-From `pt-arche-kubernetes-istio`:
+From Istio, install the runtime and diagnostic workload first:
 
 ```bash
-tests/docker/setup.sh
+tests/kubernetes/setup.sh
 ```
 
-The script locates `pt-pneuma-istio-test` automatically in standard checkout layouts. Set `ISTIO_TEST_CONTEXT` to its absolute path only if automatic discovery fails. It installs Istio with the `ambient` profile, labels `istio-test` with `istio.io/dataplane-mode: ambient`, waits for the `istio-cni-node` and `ztunnel` DaemonSets, and fails if a workload pod is not ambient-enrolled or contains an `istio-proxy` container.
+Do not apply every root at once; Kubernetes manifest providers require CRDs at plan time.
 
-Verify the resulting resources:
+From Authentik:
 
 ```bash
-kubectl wait --for=condition=Programmed gateway/gateway --namespace=istio-ingress --timeout=120s
-kubectl rollout status daemonset/istio-cni-node --namespace=istio-system --timeout=180s
-kubectl rollout status daemonset/ztunnel --namespace=istio-system --timeout=180s
-kubectl rollout status deployment/istio-test --namespace=istio-test --timeout=180s
-kubectl get gateway,httproute,authorizationpolicy --all-namespaces
-kubectl get pods --namespace=istio-test --output=custom-columns='POD:.metadata.name,CONTAINERS:.spec.containers[*].name,AMBIENT:.metadata.annotations.ambient\.istio\.io/redirection'
+tests/kubernetes/setup.sh
 ```
 
-Every `istio-test` pod must list only its application container and show `AMBIENT` as `enabled`.
+This invokes the real deployment module with a local PostgreSQL Service, no Cloud SQL proxy, and no Workload Identity. It waits for built-in Authentik objects, imports the embedded outpost and identification stage, and invokes the actual `regional/config` module. Administrative access is a transient loopback-only forward on port `19443`; browser traffic uses `https://authentik.localhost`. It stops the forward when the command exits.
 
-If setup fails, inspect the gateway, route, and policy, then use ambient diagnostics rather than sidecar ones:
+For a fresh local database, the test-only administrator login is `akadmin` / `akadmin` at `https://authentik.localhost/if/admin/`. Never use this password outside the dedicated local fixture. Database credentials, API tokens, and signing keys remain generated. Bootstrap does not overwrite passwords in a retained database.
 
-- `kubectl logs --namespace=istio-system daemonset/istio-cni-node --tail=100` for CNI install or pod redirection failures;
-- `kubectl logs --namespace=istio-system daemonset/ztunnel --tail=100` for HBONE connections, workload identities (`src.identity`), and mTLS errors;
-- `kubectl logs --namespace=istio-ingress deployment/gateway-istio --tail=100` for ingress routing and `ext_authz` decisions.
+The login at `authentik.localhost` uses Pneuma's checked-out `regional/authentik-config/authentication` child module: the sandbox CSS, dark theme, osinfra logo/favicon, custom authentication flow, identification settings, stage order, and password/MFA policy wiring are shared. Only the domain and displayed titles become local Development values. Built-in stages and policies are discovered locally, and the existing local brand is moved in state rather than duplicated.
 
-Do not read or search `.terraform/` directories.
-
-## Verify public bypasses
-
-Request the public health and metadata endpoints without following redirects:
+After Authentik configuration, from Istio apply the shared browser policies and ingress routes:
 
 ```bash
-curl --insecure --silent --show-error --dump-header - --output /dev/null https://dev.localhost/istio-test/health
-curl --insecure --silent --show-error --dump-header - --output /dev/null https://dev.localhost/istio-test/metadata/cluster-name
+tests/kubernetes/apply-auth.sh
+tests/kubernetes/apply-routes.sh
 ```
 
-Require both responses to return `200` without a `Location` header pointing to Authentik. These endpoints are public diagnostics; an Authentik redirect means the public-path bypass is not working.
-
-## Verify forward authentication
-
-Request the protected identity diagnostic without following redirects:
+Then from agentgateway:
 
 ```bash
-curl --insecure --silent --show-error --dump-header - --output /dev/null https://dev.localhost/istio-test/auth
+tests/kubernetes/setup.sh
 ```
 
-Require all of the following:
+This invokes its checked-out deployment and manifest modules in separate stages, not copied chart versions or a second proxy configuration.
 
-- status `302`;
-- `Location` begins with `https://authentik.localhost/application/o/authorize/`;
-- the encoded callback points to `https://dev.localhost/outpost.goauthentik.io/callback`.
+Rerun the relevant component setup/apply after editing application configuration, then rerun verification without resetting the database. Do not switch to a released module pin that would omit local edits.
 
-Then follow redirects to verify that the Authentik login flow is reachable:
+### Developer handoff
 
-```bash
-curl --insecure --location --silent --show-error --output /dev/null --write-out '%{http_code}\n' https://dev.localhost/istio-test/auth
-```
+After setup, explicitly explain how to test a change:
 
-The final status must be `200`. A redirect to any host other than `authentik.localhost` indicates that the embedded outpost's `authentik_host` is stale or unset.
+- Edit checked-out code, including uncommitted changes. Rerun Authentik or agentgateway `tests/kubernetes/setup.sh` for changes to those component modules. For Istio runtime changes rerun setup; for shared browser-auth policies or local routes rerun `apply-auth.sh` or `apply-routes.sh`.
+- Run the component verifiers and this skill's holistic HTTP verifier, then exercise the specific changed behavior through the browser URLs below. Check expected access and denial; healthy services alone do not verify the change.
+- Do not tear down during normal iteration. Teardown deletes local users, memberships, and database data.
+- Changes to Pneuma's `regional/authentik-config/authentication` brand, flow, stages, policies, or identification settings are exercised by rerunning Authentik setup and verification. Changes to the shared Istio browser-auth renderer are exercised by rerunning `apply-auth.sh`.
+- Explain the fidelity boundary: authentication configuration and Istio browser-auth rendering are shared; local domains/titles, OAuth client/callback, application IDs, and explicit local groups substitute for cloud discovery. PostgreSQL, upstream images, local TLS, and Kind substitute for Cloud SQL, mirrored registries, cloud certificates, Workload Identity, and GCP networking. Cloud root discovery, environment enablement, and multi-region behavior still require sandbox verification.
+- Local testing does not deploy sandbox or update released module pins. Use the normal PR/release process after local verification.
 
-## Install and verify the AgentGateway layer
+## Automated verification
 
-From `pt-arche-kubernetes-agentgateway`, after the Istio checks above pass:
+Run each component's `tests/kubernetes/verify.sh`, then `python3 scripts/verify-http.py` relative to this skill directory.
 
-```bash
-tests/docker/setup.sh
-```
+Require:
 
-The script pins the AgentGateway Helm charts (`AGENTGATEWAY_VERSION`), enrolls `agentgateway-system` in ambient mode, and applies the internal proxy `Gateway`, `AgentgatewayParameters`, ingress and backend `HTTPRoute`s, the `ReferenceGrant` in `istio-test`, an Authentik outpost route, and an Authentik `CUSTOM` `AuthorizationPolicy` for the `agentgateway.localhost` host. AgentGateway is served on `https://agentgateway.localhost` through the Istio gateway's `*.localhost` listener; the Istio test workload stays on `dev.localhost`. It fails unless the controller and proxy roll out, the proxy is ambient-enrolled with no `istio-proxy`, the Gateway is `Programmed`, both routes are `Accepted` and `ResolvedRefs`, `/agentgateway-test/health` and `/agentgateway-test/metadata/cluster-name` return `200`, `/agentgateway-test/auth` redirects to Authentik with a callback on `agentgateway.localhost`, with and without spoofed `X-Authentik-*` headers, the outpost path answers on `agentgateway.localhost`, and the admin UI at `/ui/` redirects to Authentik. On failure it prints Helm releases, CRDs, Gateway and route status, the `ReferenceGrant`, pods, controller/proxy logs, and ztunnel logs.
+- Ready Authentik/server/worker/database, Istio CNI/ztunnel, agentgateway/controller/proxy, and diagnostic workloads.
+- The local hostname selects the shared brand/custom flow; live brand/CSS, identification settings, all four stage bindings, and both password/MFA policy bindings match the applied shared module. The test-only administrator must complete identification, password, and login and establish an authenticated session. This is not Google browser verification.
+- Programmed gateways and Accepted/ResolvedRefs for each route's intended parent.
+- Ambient workload/proxy enrollment, with no injected `istio-proxy` sidecars.
+- Exactly `200` without redirects for public health and metadata endpoints on both paths.
+- Exactly `302` to Authentik for protected paths, with the correct per-host outpost callback, both with and without forged identity headers.
+- Outpost ping `204`, reachable callback routing, and the registered Google localhost callback.
+- Authentik protection for the agentgateway admin UI.
 
-Before changing the pinned version, resolve the latest stable release with `gh release list --repo agentgateway/agentgateway --exclude-pre-releases --limit 1`. Never downgrade Istio or select an older AgentGateway release to make the test pass; record an incompatibility as blocked with a minimal reproduction and an upstream issue instead.
+The shared HTTP verifier uses loopback explicitly while preserving host/SNI, disables proxy use for local requests, and never follows protected redirects. It does not read credentials or store browser cookies.
 
-Confirm the in-mesh hops are mutual TLS through ztunnel. The proxy pools connections, so use ztunnel metrics rather than access logs:
+Exercise fail-closed behavior only on owned fixtures: temporarily stop the Authentik authorization server, require protected traffic to be denied, restore it, and verify recovery. Restore the server even if the negative test fails. Do not mask errors as success.
 
-```bash
-timeout 20 kubectl port-forward --namespace=istio-system daemonset/ztunnel 15020:15020 >/dev/null &
-sleep 3
-curl --silent http://localhost:15020/metrics | grep '^istio_tcp_connections_opened_total' | grep agentgateway-proxy
-wait
-```
+Verify agentgateway admin port `15000` denies an unauthorized in-mesh workload. Its browser UI is `https://agentgateway.localhost/ui/`; never offer a direct port-forward as an authenticated UI path.
 
-`kubectl port-forward` blocks until stopped, so run it in the background with a `timeout` and query the metrics while it is active. Expect `connection_security_policy="mutual_tls"` series for `gateway-istio` -> `agentgateway-proxy` and `agentgateway-proxy` -> `istio-test`.
+After traffic generation, inspect ztunnel metrics on every relevant node. Require `connection_security_policy="mutual_tls"` evidence for Istio ingress to agentgateway and agentgateway to the diagnostic workload. A single randomly chosen daemonset pod or absence of connection logs is insufficient.
 
-## Identify the failing layer
+## Browser verification
 
-| Symptom | Owning layer | Inspect |
-| --- | --- | --- |
-| Protected path returns `404` before any redirect; `failed to fetch providers` in server logs | Authentik | `docker compose ... logs --tail=200 server`; secret key vs bootstrap token |
-| `istio-cni-node` or `ztunnel` not ready; pod missing `ambient.istio.io/redirection` | Istio ambient | `istio-cni-node` and `ztunnel` logs; Kind provisioner and mount propagation |
-| Public path redirects to Authentik, or protected path returns `200` without sign-in | Istio authorization | `AuthorizationPolicy` paths/`notPaths`; `gateway-istio` logs |
-| `Programmed`, `Accepted`, or `ResolvedRefs` not `True`; `5xx` only on `/agentgateway-test` | AgentGateway | `helm list -n agentgateway-system`; `kubectl get crd \| grep agentgateway.dev`; route status; `agentgateway` and `agentgateway-proxy` logs; `ReferenceGrant` |
-| Connection resets between gateways and workloads | ztunnel/mTLS | ztunnel logs and `istio_tcp_connections_opened_total` |
-| Controller logs reject Istio resources or versions | AgentGateway/Istio compatibility | Release notes and upstream issues for the pinned versions |
-
-## Complete the browser test
-
-Tell the user to open:
+Leave the owned fixtures running and direct the developer to:
 
 ```text
 https://dev.localhost/istio-test/auth
+https://agentgateway.localhost/agentgateway-test/auth
+https://agentgateway.localhost/ui/
 ```
 
-When the AgentGateway layer is installed, also open `https://agentgateway.localhost/agentgateway-test/auth`; success returns the same identity diagnostic through AgentGateway. The AgentGateway admin UI is at `https://agentgateway.localhost/ui/` behind the same Authentik sign-in. Never offer `kubectl port-forward` to proxy port `15000` as the UI URL: it bypasses Authentik. In-mesh access to port `15000` from anything other than the Istio ingress gateway is denied by the `agentgateway-admin` ztunnel policy. They must accept the temporary self-signed certificate warning. Select Google and authenticate with an allowed Workspace account. Success returns a JSON diagnostic showing the trusted `x-authentik-*` identity headers that Authentik forwarded to the workload. Browser identity reaches the workload through these headers rather than a JWT. After the browser test, confirm the in-mesh hop was carried by ztunnel: `kubectl logs --namespace=istio-system daemonset/ztunnel --since=5m | grep istio-test` should show `connection complete` entries with `src.identity="spiffe://cluster.local/ns/istio-test/sa/default"`. Do not claim interactive end-to-end success unless the browser callback has actually completed.
+Accept the temporary local certificate warning and sign in through Google. Both diagnostic paths must return the actual user's trusted `x-authentik-*` identity as JSON. Browser identity is conveyed by headers, not a bearer JWT.
+
+Verify authenticated requests cannot override the actual user through forged identity headers. Remove the test user's required local group membership, require denial, then restore membership and verify recovery. Do not change Google/production groups or retain personal identity output in session artifacts.
+
+If browser automation or the developer is unavailable, stop with **automated checks passed; Google browser verification pending**, not full success. If automated checks failed, report those failures separately.
+
+Demonstrate configuration parity by changing a relevant checked-out policy/configuration and observing the expected local behavior change, then restoring the intended configuration. A fixture that independently reproduces the old behavior is not enough.
+
+## Diagnostics
+
+| Failure | Inspect |
+| --- | --- |
+| Ownership guard rejects setup | Existing state and installations; preserve the old stack and resolve migration explicitly |
+| Authentik bootstrap/API objects not ready | Kubernetes PostgreSQL/server/worker status and redacted logs |
+| Ambient enrollment fails | Kind provisioner, mount propagation, CNI and ztunnel logs |
+| Public endpoints redirect or protected requests bypass sign-in | Shared authorization inputs, gateway policies, inbound header stripping, ingress logs |
+| Agentgateway route/proxy fails | Chart availability, staged CRDs, intended route-parent conditions, ReferenceGrant and proxy/controller logs |
+| Browser callback fails | Registered Google localhost URI, Host rewrite, callback redirect, Authentik session host |
+| In-mesh traffic resets or returns 503 | Workload endpoints, ztunnel identities, mTLS metrics and certificate readiness |
+
+Use bounded waits. Do not downgrade Istio or agentgateway to sidestep incompatibilities; report a blocked version with evidence. Local success does not validate GCP load balancing, Cloud Armor, Workload Identity, Cloud SQL, multi-region behavior, or the complete sandbox deployment.
 
 ## Cleanup
 
-Only tear down when requested. The teardown scripts delete cluster-scoped Gateway API and AgentGateway CRDs, which also deletes every resource of those kinds. Run them only on a Docker Desktop cluster dedicated to these fixtures. If Gateway API or AgentGateway resources exist that these fixtures did not create, stop and explain the risk instead of tearing down.
-
-If the AgentGateway layer is installed, first run from `pt-arche-kubernetes-agentgateway`:
+Cleanup is explicit and owned-resource-only. It deletes all fixture namespaces, including local users and PostgreSQL data. Stop agentgateway first, then Authentik, then Istio:
 
 ```bash
-tests/docker/teardown.sh
+# In each owning repository:
+tests/kubernetes/teardown.sh
 ```
 
-It deletes the fixture manifests, both Helm releases, the AgentGateway CRDs, the controller-created `GatewayClass`, and `agentgateway-system`, then fails if any AgentGateway resources remain.
+Teardown removes `agentgateway`, `authentik`, `istio-system`, `istio-ingress`, and `istio-test` after checking fixture ownership. Authentik clears application configuration state after deleting its namespace and database volume so the next setup imports newly bootstrapped objects rather than using stale IDs. Generated local credentials remain in `.work/`, but users, memberships, and application data are recreated on the next setup. No separate reset command is needed. Rerunning setup without teardown still preserves the running database for iteration.
 
-Then from `pt-arche-kubernetes-istio`:
+Agentgateway's local CRD chart uses a Bash post-renderer with `jq` that invokes `kubectl --local` and preserves each manifest's document boundary while adding Helm's `keep` resource policy. This retains its cluster-wide CRDs when the component's release and namespace are destroyed; ordinary cloud deployment defaults are unchanged.
 
-```bash
-tests/docker/teardown.sh
-```
-
-This deletes the test namespaces, purges `istiod`, `istio-cni`, `ztunnel`, and the ingress gateway with `istioctl uninstall --purge`, and removes the Gateway API CRDs. The `istio-test:local` image remains in the Kind node's containerd store.
-
-Then from `pt-arche-kubernetes-authentik`:
-
-```bash
-tofu -chdir=tests/docker/regional/config destroy -auto-approve
-docker compose --env-file tests/docker/.env --file tests/docker/compose.yml down --volumes
-```
-
-Report which fixtures remain running when cleanup is skipped.
+Do not remove cluster-wide CRDs or unowned installations. Report retained namespaces, data, runtime components, and owned helper processes accurately.
