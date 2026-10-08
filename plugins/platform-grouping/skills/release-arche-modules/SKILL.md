@@ -51,7 +51,7 @@ Before committing, check the existing signing configuration and main-branch sign
 For each releasable repo, fetch `main` and tags and retrieve its latest published release once:
 
 ```bash
-git -C "$REPO_DIR" fetch --quiet origin main --tags
+git -C "$REPO_DIR" fetch --quiet origin +refs/heads/main:refs/remotes/origin/main --tags
 gh release view --repo "osinfra-io/$REPO" --json tagName,url
 ```
 
