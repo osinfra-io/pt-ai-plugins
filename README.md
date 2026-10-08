@@ -35,7 +35,7 @@ copilot plugin marketplace browse osinfra-io
 | `create-pull-request` | Open a pull request using platform conventions |
 | `release-arche-modules` | Release the Arche dependency chain and update consumers |
 | `release-plugins` | Release plugins and synchronize marketplace metadata |
-| `test-istio-authentik-locally` | Exercise the local Istio and Authentik browser-authentication flow |
+| `test-local-gateway-stack` | Exercise the local Istio, Authentik, and AgentGateway browser-authentication flow |
 | `update-arche-component-versions` | Update upstream Kubernetes component versions and release affected modules |
 
 Install `platform-grouping` for engineering workflows. Install `techne-agents` when you need the Nomos self-service platform interface.

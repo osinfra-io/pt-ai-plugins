@@ -1,9 +1,9 @@
 ---
-name: test-istio-authentik-locally
+name: test-local-gateway-stack
 description: Set up, test, debug, and tear down the local Authentik and Istio browser-authentication flow on an ambient-only Istio mesh with Docker Desktop Kubernetes (Kind provisioner). Optionally layers AgentGateway behind Istio. Use when asked to run or troubleshoot local Istio, Authentik, AgentGateway, forward-auth, ext_authz, or browser authentication tests in the osinfra-io platform repositories.
 ---
 
-# Test Istio and Authentik locally
+# Test the local gateway stack
 
 Execute the local browser-authentication test autonomously against an ambient-only mesh (`istiod`, `istio-cni`, `ztunnel`; no sidecars), matching production. Diagnose and fix setup failures rather than only printing commands. Stop before the interactive sign-in when no browser automation is available, report the exact URL to open, and leave the fixtures running unless the user asks for cleanup.
 
