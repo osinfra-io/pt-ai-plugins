@@ -103,6 +103,36 @@ class HTTPVerificationTests(unittest.TestCase):
             with self.assertRaises(RuntimeError):
                 verifier.check_diagnostic("https://dev.localhost/istio-test/health", "health")
 
+    def test_expected_status_waits_for_policy_propagation(self):
+        responses = [Response(200), Response(302)]
+        with (
+            patch.object(verifier, "response", side_effect=responses),
+            patch.object(verifier.time, "sleep"),
+        ):
+            verifier.check_expected_status(
+                "https://dev.localhost/istio-test/metadata/cluster-name",
+                302,
+                timeout=10,
+                interval=1,
+            )
+
+    def test_expected_status_rejects_nonlocal_urls(self):
+        with self.assertRaisesRegex(RuntimeError, "restricted to local HTTPS gateway hosts"):
+            verifier.check_expected_status("https://example.invalid/path", 302)
+
+    def test_expected_status_reports_last_response_on_timeout(self):
+        with (
+            patch.object(verifier, "response", return_value=Response(200)),
+            patch.object(verifier.time, "monotonic", side_effect=[0, 2]),
+        ):
+            with self.assertRaisesRegex(RuntimeError, "last observed 200"):
+                verifier.check_expected_status(
+                    "https://dev.localhost/istio-test/metadata/cluster-name",
+                    302,
+                    timeout=1,
+                    interval=1,
+                )
+
 
 if __name__ == "__main__":
     unittest.main()
