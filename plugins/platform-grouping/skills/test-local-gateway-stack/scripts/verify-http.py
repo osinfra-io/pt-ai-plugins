@@ -115,7 +115,7 @@ def check_expected_status(url, expected_status, timeout=120, interval=2):
                 last_status = str(result.code)
                 if result.code == expected_status:
                     return
-        except urllib.error.URLError:
+        except (OSError, http.client.HTTPException):
             last_status = "connection unavailable"
 
         remaining = deadline - time.monotonic()

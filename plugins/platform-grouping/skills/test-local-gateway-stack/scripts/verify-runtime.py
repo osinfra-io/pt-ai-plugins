@@ -27,7 +27,7 @@ ADMIN_CLIENT_IMAGE = "curlimages/curl:8.16.0"
 POLL_INTERVAL_SECONDS = 2
 RECOVERY_TIMEOUT_SECONDS = 180
 OUTAGE_TIMEOUT_SECONDS = 90
-METRIC_RE = re.compile(r"([a-zA-Z_][a-zA-Z0-9_]*)=\"((?:\\\\.|[^\"])*)\"")
+METRIC_RE = re.compile(r'([a-zA-Z_][a-zA-Z0-9_]*)="((?:\\.|[^"\\])*)"')
 
 
 class VerificationError(RuntimeError):

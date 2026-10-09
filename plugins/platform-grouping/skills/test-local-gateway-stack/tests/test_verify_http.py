@@ -116,6 +116,23 @@ class HTTPVerificationTests(unittest.TestCase):
                 interval=1,
             )
 
+    def test_expected_status_retries_connection_level_errors(self):
+        for error in (
+            ConnectionResetError("connection reset"),
+            verifier.http.client.RemoteDisconnected("connection closed"),
+        ):
+            with self.subTest(error=type(error).__name__):
+                with (
+                    patch.object(verifier, "response", side_effect=[error, Response(302)]),
+                    patch.object(verifier.time, "sleep"),
+                ):
+                    verifier.check_expected_status(
+                        "https://dev.localhost/istio-test/metadata/cluster-name",
+                        302,
+                        timeout=10,
+                        interval=1,
+                    )
+
     def test_expected_status_rejects_nonlocal_urls(self):
         with self.assertRaisesRegex(RuntimeError, "restricted to local HTTPS gateway hosts"):
             verifier.check_expected_status("https://example.invalid/path", 302)

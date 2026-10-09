@@ -46,6 +46,11 @@ class RuntimeVerificationTests(unittest.TestCase):
                     )
                 )
 
+    def test_metric_parser_handles_escaped_quotes_and_backslashes(self):
+        metric = r'metric_name{label="quote:\"slash:\\end"} 1'
+        labels = verifier.parse_metrics(metric)[0].labels
+        self.assertEqual(labels, {"label": r"quote:\"slash:\\end"})
+
     def test_admin_policy_requires_deny_flag(self):
         metric = (
             'istio_tcp_connections_closed_total{source_workload="unauthorized-admin-check",'
