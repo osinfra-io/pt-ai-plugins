@@ -7,7 +7,7 @@ description: Exercise checked-out Authentik, Istio ambient, and agentgateway con
 
 This is an **opt-in developer integration test for complex configuration changes**, not a mandatory pre-push check or CI gate. Run the whole stack in Kubernetes, including Authentik and local PostgreSQL. Keep mocked OpenTofu tests separate.
 
-Use the component scripts directly; do not reimplement their deployment in ad-hoc Helm commands or test YAML. Diagnose failures explicitly and stop before destructive migration or interactive sign-in when those steps cannot be completed safely. Never report full integration success without observed Google sign-in and identity verification.
+Use the component scripts and this skill's checked-in verification scripts directly. Do not write one-off shell commands, inline programs, ad-hoc Helm commands, or test YAML to manipulate the cluster or perform required checks. If a required behavior is not covered by an existing script, add a reusable, tested helper to this skill or the owning component before running it. Diagnose failures explicitly and stop before destructive migration or interactive sign-in when those steps cannot be completed safely. Never report full integration success without observed Google sign-in and identity verification.
 
 ## Repository discovery
 
@@ -107,7 +107,22 @@ After setup, explicitly explain how to test a change:
 
 ## Automated verification
 
-Run each component's `tests/kubernetes/verify.sh`, then `python3 scripts/verify-http.py` relative to this skill directory.
+From the skill directory, run the single verification entry point with the absolute aggregated-workspace root:
+
+```bash
+scripts/verify-stack.sh /absolute/path/to/platform-group
+```
+
+The runner invokes each component's `tests/kubernetes/verify.sh` from that component's checkout, then the holistic HTTP verifier, then the runtime security checks. It stops on the first failed stage, leaves the owned fixtures running, identifies the failed stage, and never tears down the stack as a fallback. Do not replace it with hand-built `kubectl`, `curl`, or metric commands.
+
+For configuration-parity iterations, apply the edited configuration using its owning component script, then use the HTTP verifier's bounded expected-status mode to wait for gateway policy propagation. For example:
+
+```bash
+python3 scripts/verify-http.py --expect-status 302 --timeout 120 \
+  https://dev.localhost/istio-test/metadata/cluster-name
+```
+
+Use the expected status for the specific temporary behavior, restore the intended configuration, reapply it, and wait for the original expected status the same way. A single immediate HTTP sample can race Istio propagation and is not evidence of either the temporary behavior or successful restoration.
 
 Require:
 
@@ -120,11 +135,13 @@ Require:
 - Outpost ping `204`, reachable callback routing, and the registered Google localhost callback.
 - Authentik protection for the agentgateway admin UI.
 
-The shared HTTP verifier uses loopback explicitly while preserving host/SNI, disables proxy use for local requests, and never follows protected redirects. It does not read credentials or store browser cookies.
+The shared HTTP verifier uses loopback explicitly while preserving host/SNI, disables proxy use for local requests, and never follows protected redirects. Its expected-status mode polls only the allowlisted local HTTPS hostnames and reports the last observed status at timeout. It does not read credentials or store browser cookies.
 
-Exercise fail-closed behavior only on owned fixtures: temporarily stop the Authentik authorization server, require protected traffic to be denied, restore it, and verify recovery. Restore the server even if the negative test fails. Do not mask errors as success.
+The runtime verifier tests fail-closed behavior only on the owned fixture. It records the Authentik server's replica count, temporarily scales that deployment to zero, waits for endpoints to disappear, checks protected traffic is denied, restores the original count even after errors or termination signals, and waits up to three minutes for both ready endpoints and the protected route's HTTP 302 recovery. A restoration or recovery failure is a failed run, not a successful negative test; report that state plainly and do not continue to browser sign-in until the stack is healthy.
 
-Verify agentgateway admin port `15000` denies an unauthorized in-mesh workload. Its browser UI is `https://agentgateway.localhost/ui/`; never offer a direct port-forward as an authenticated UI path.
+The runtime verifier also creates and removes a short-lived curl workload in the ambient `istio-test` namespace to exercise Agentgateway admin port `15000`. It requires a ztunnel `DENY` metric for that request; a TCP reset is an expected denial, not a failed HTTP status assertion. It inspects ztunnel metrics on every node hosting the relevant source or destination workload and requires positive counters with `connection_security_policy="mutual_tls"` for ingress-to-Agentgateway and Agentgateway-to-diagnostic traffic. Its output distinguishes each verified result from failures. The Agentgateway browser UI is `https://agentgateway.localhost/ui/`; never offer a direct port-forward as an authenticated UI path.
+
+Do not report the fail-closed check as successful until Authentik restoration and HTTP 302 recovery have both been observed. If restoration fails, state that explicitly, do not proceed with remaining checks, and use the owning Authentik component verifier/setup script to diagnose and restore the owned fixture before retrying. Do not manually scale workloads with ad-hoc commands.
 
 After traffic generation, inspect ztunnel metrics on every relevant node. Require `connection_security_policy="mutual_tls"` evidence for Istio ingress to agentgateway and agentgateway to the diagnostic workload. A single randomly chosen daemonset pod or absence of connection logs is insufficient.
 
@@ -142,7 +159,7 @@ Accept the temporary local certificate warning and sign in through Google. Both 
 
 Verify authenticated requests cannot override the actual user through forged identity headers. Remove the test user's required local group membership, require denial, then restore membership and verify recovery. Do not change Google/production groups or retain personal identity output in session artifacts.
 
-If browser automation or the developer is unavailable, stop with **automated checks passed; Google browser verification pending**, not full success. If automated checks failed, report those failures separately.
+If browser automation or the developer is unavailable, stop with **automated checks passed; Google browser verification pending**, not full success. That status is allowed only after the verification runner has exited successfully, including Authentik recovery, admin denial, and per-node mTLS checks. If any automated check or restoration failed, report that failure separately and do not say automated checks passed.
 
 Demonstrate configuration parity by changing a relevant checked-out policy/configuration and observing the expected local behavior change, then restoring the intended configuration. A fixture that independently reproduces the old behavior is not enough.
 

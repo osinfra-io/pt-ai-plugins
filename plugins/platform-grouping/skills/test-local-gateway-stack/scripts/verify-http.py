@@ -1,11 +1,13 @@
 #!/usr/bin/env python3
 """Check anonymous gateway behavior without logging credentials or identity."""
 
+import argparse
 import http.client
 import json
 import socket
 import ssl
 import sys
+import time
 import urllib.error
 import urllib.parse
 import urllib.request
@@ -94,7 +96,57 @@ OPENER = urllib.request.build_opener(
 )
 
 
+def check_expected_status(url, expected_status, timeout=120, interval=2):
+    parsed = urllib.parse.urlsplit(url)
+    if parsed.scheme != "https" or parsed.hostname not in (
+        "dev.localhost",
+        "agentgateway.localhost",
+        "authentik.localhost",
+    ):
+        raise RuntimeError("Expected-status checks are restricted to local HTTPS gateway hosts.")
+    if not 100 <= expected_status <= 599 or timeout <= 0 or interval <= 0:
+        raise RuntimeError("Expected status and polling timeout must be valid positive values.")
+
+    deadline = time.monotonic() + timeout
+    last_status = "no response"
+    while True:
+        try:
+            with response(url) as result:
+                last_status = str(result.code)
+                if result.code == expected_status:
+                    return
+        except (OSError, http.client.HTTPException):
+            last_status = "connection unavailable"
+
+        remaining = deadline - time.monotonic()
+        if remaining <= 0:
+            raise RuntimeError(
+                f"Expected HTTP {expected_status} from {url} within {timeout}s; "
+                f"last observed {last_status}."
+            )
+        time.sleep(min(interval, remaining))
+
+
 def main():
+    parser = argparse.ArgumentParser(description="Verify local gateway HTTP behavior.")
+    parser.add_argument("--expect-status", type=int, help="Poll for this exact HTTP status instead of running the full anonymous suite.")
+    parser.add_argument("--timeout", type=int, default=120, help="Maximum wait for --expect-status (default: 120 seconds).")
+    parser.add_argument("url", nargs="?", help="Local HTTPS URL used with --expect-status.")
+    args = parser.parse_args()
+
+    if args.expect_status is not None:
+        if args.url is None:
+            parser.error("a URL is required with --expect-status")
+        try:
+            check_expected_status(args.url, args.expect_status, args.timeout)
+            print(f"Observed expected HTTP {args.expect_status} from {args.url}.")
+            return
+        except (RuntimeError, urllib.error.URLError, TimeoutError) as error:
+            print(f"Gateway HTTP verification failed: {error}", file=sys.stderr)
+            sys.exit(1)
+    if args.url is not None:
+        parser.error("URL is only valid with --expect-status")
+
     for host, prefix in (
         ("dev.localhost", "/istio-test"),
         ("agentgateway.localhost", "/agentgateway-test"),
