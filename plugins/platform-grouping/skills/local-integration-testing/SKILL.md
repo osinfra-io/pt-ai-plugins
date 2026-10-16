@@ -1,5 +1,5 @@
 ---
-name: test-local-integration
+name: local-integration-testing
 description: Exercise checked-out Authentik, Istio ambient, agentgateway, and OpenBao configuration together in dedicated Docker Desktop Kind Kubernetes before optional sandbox deployment. Coordinates repo-owned tests/kubernetes fixtures and real Google browser sign-in.
 ---
 
