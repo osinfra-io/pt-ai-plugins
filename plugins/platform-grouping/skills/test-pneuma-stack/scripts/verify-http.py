@@ -25,7 +25,7 @@ class LocalConnection(http.client.HTTPSConnection):
 
     @staticmethod
     def local_socket(address, timeout=15, source_address=None):
-        if address[0] not in ("dev.localhost", "agentgateway.localhost", "authentik.localhost"):
+        if address[0] not in ("dev.localhost", "agentgateway.localhost", "authentik.localhost", "openbao.localhost"):
             raise RuntimeError("Verification is restricted to local gateway hosts.")
         return socket.create_connection(("127.0.0.1", address[1]), timeout, source_address)
 
@@ -102,6 +102,7 @@ def check_expected_status(url, expected_status, timeout=120, interval=2):
         "dev.localhost",
         "agentgateway.localhost",
         "authentik.localhost",
+        "openbao.localhost",
     ):
         raise RuntimeError("Expected-status checks are restricted to local HTTPS gateway hosts.")
     if not 100 <= expected_status <= 599 or timeout <= 0 or interval <= 0:
