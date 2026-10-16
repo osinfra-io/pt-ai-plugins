@@ -27,13 +27,17 @@ The gateway rewrites Google source requests to the `localhost` Host and returns 
 
 ## Setup and iteration
 
+Run `tests/integration/shared/preflight.sh` first (without `--claim`) to check an existing stack. If it fails only with `No ownership marker`, the cluster is unclaimed: confirm with the developer that it is a dedicated test cluster, then run `setup.sh --claim`, which validates that no namespaces, Helm installations, or gateway/mesh CRDs exist before recording ownership. Stop on any other preflight failure.
+
 ```bash
 tests/integration/setup.sh --claim   # --claim only on a fresh dedicated cluster
 ```
 
+If a checked-in script is itself broken, fix it with the edit tool as a small reusable change in `pt-pneuma/tests/integration` (with a test where one exists) and open a PR for it. Do not work around it with inline commands or rewrite files with scripts. Prefer one definition of shared constants, such as `shared/owner.sh`, over redeclaring them in component scripts.
+
 The order is Istio ambient runtime and shared gateway, Authentik (local PostgreSQL, real deployment and configuration modules), browser-auth policies and routes, agentgateway, then OpenBao. Do not apply every root at once; Kubernetes manifest providers need CRDs at plan time. Components can be rerun individually (`tests/integration/<component>/setup.sh`, plus `istio/apply-auth.sh` and `istio/apply-routes.sh`) after editing the matching checked-out module without resetting the database.
 
-For a fresh database the test-only administrator is `akadmin` / `akadmin` at `https://authentik.localhost/if/admin/`; never use that password elsewhere. Credentials, OpenBao's root token and unseal key, and state live in ignored `.work/` directories; never print them.
+For a fresh database the test-only administrator is `akadmin` / `akadmin` at `https://authentik.localhost/if/admin/`; never use that password elsewhere. Credentials, OpenBao's root token and unseal key, and state live in ignored `.work/` directories. Never print the Google OAuth values, the `akadmin` password, or the unseal key. The exception is OpenBao's root token, a throwaway for the local cluster: after setup, run `tests/integration/openbao/show-credentials.sh` and give the developer the OpenBao URL (`https://openbao.localhost/ui/`, sign in with the Token method) and the printed root token.
 
 ### Developer handoff
 
@@ -64,7 +68,7 @@ python3 tests/integration/verify/verify-http.py --expect-status 302 --timeout 12
 
 Use the expected status for the specific temporary behavior, restore the intended configuration, reapply it, and wait for the original status the same way. A single immediate sample can race Istio propagation.
 
-A passing run covers ready Authentik/Istio/agentgateway/OpenBao and diagnostic workloads; Authentik branding, flow, stage and policy parity plus a test-administrator login (not Google verification); Programmed gateways and Accepted/ResolvedRefs routes; ambient enrollment without sidecars; exact `200` for public endpoints and exact `302` to Authentik for protected paths with and without forged identity headers; Authentik protection of the agentgateway admin UI; OpenBao health and denied unauthenticated or forged-token access; fail-closed behavior with Authentik scaled to zero and restored (HTTP 302 recovery required); in-mesh admin-port denial; and `mutual_tls` ztunnel metrics on every relevant node.
+A passing run covers ready Authentik/Istio/agentgateway/OpenBao and diagnostic workloads; Authentik branding, flow, stage and policy parity plus a test-administrator login (not Google verification); Programmed gateways and Accepted/ResolvedRefs routes; ambient enrollment without sidecars; exact `200` for public endpoints and exact `302` to Authentik for protected paths with and without forged identity headers; Authentik protection of the agentgateway admin UI; OpenBao health and denied unauthenticated or forged-token access; fail-closed behavior with Authentik scaled to zero (protected requests denied with HTTP 403, or a connection failure reported as status `000` with a nonzero curl exit) and restored (HTTP 302 recovery required); in-mesh admin-port denial; and `mutual_tls` ztunnel metrics on every relevant node.
 
 If restoration or recovery fails, state that explicitly, do not continue, and diagnose with the owning Authentik component script. Do not manually scale workloads with ad-hoc commands. Do not report the fail-closed check as successful until restoration and recovery were both observed.
 
@@ -76,13 +80,16 @@ Leave the fixtures running and direct the developer to:
 https://dev.localhost/istio-test/auth
 https://agentgateway.localhost/agentgateway-test/auth
 https://agentgateway.localhost/ui/
+https://openbao.localhost/ui/
 ```
+
+OpenBao uses its own root token rather than Google sign-in; present it with the URL as described above.
 
 Accept the temporary certificate warning and sign in through Google. Both diagnostic paths must return the actual user's trusted `x-authentik-*` identity as JSON (headers, not a bearer JWT). Verify forged identity headers cannot override the actual user. Remove the test user's required local group membership, require denial, then restore membership and verify recovery. Do not change Google/production groups or retain personal identity output in session artifacts. Never offer a direct port-forward as an authenticated UI path.
 
-If browser automation or the developer is unavailable, stop with **automated checks passed; Google browser verification pending**, allowed only after `verify.sh` exited successfully. If any automated check or restoration failed, report that failure instead.
+If browser automation or the developer is unavailable, including unattended or autopilot runs, stop with **automated checks passed; Google browser verification pending**, allowed only after `verify.sh` exited successfully. Leave the fixtures running and include the URLs, OpenBao credentials, and remaining manual steps in the final report. If any automated check or restoration failed, report that failure instead.
 
-Demonstrate configuration parity by changing a relevant checked-out policy or configuration, observing the expected local behavior change, then restoring it.
+Configuration parity is required for a full report: change a relevant checked-out policy or configuration, apply it with its owning script, observe the expected change with `verify-http.py --expect-status`, then restore, reapply, and observe the original status. If you skip it, state that explicitly in the report.
 
 ## Diagnostics
 
