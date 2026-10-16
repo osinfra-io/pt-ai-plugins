@@ -27,7 +27,7 @@ The gateway rewrites Google source requests to the `localhost` Host and returns 
 
 ## Setup and iteration
 
-Run `tests/integration/shared/preflight.sh` first (without `--claim`) to see whether the cluster is already owned; pass `--claim` to `setup.sh` only when it reports a fresh dedicated cluster.
+Run `tests/integration/shared/preflight.sh` first (without `--claim`) to check an existing stack. If it fails only with `No ownership marker`, the cluster is unclaimed: confirm with the developer that it is a dedicated test cluster, then run `setup.sh --claim`, which validates that no namespaces, Helm installations, or gateway/mesh CRDs exist before recording ownership. Stop on any other preflight failure.
 
 ```bash
 tests/integration/setup.sh --claim   # --claim only on a fresh dedicated cluster
@@ -68,7 +68,7 @@ python3 tests/integration/verify/verify-http.py --expect-status 302 --timeout 12
 
 Use the expected status for the specific temporary behavior, restore the intended configuration, reapply it, and wait for the original status the same way. A single immediate sample can race Istio propagation.
 
-A passing run covers ready Authentik/Istio/agentgateway/OpenBao and diagnostic workloads; Authentik branding, flow, stage and policy parity plus a test-administrator login (not Google verification); Programmed gateways and Accepted/ResolvedRefs routes; ambient enrollment without sidecars; exact `200` for public endpoints and exact `302` to Authentik for protected paths with and without forged identity headers; Authentik protection of the agentgateway admin UI; OpenBao health and denied unauthenticated or forged-token access; fail-closed behavior with Authentik scaled to zero (protected requests denied with HTTP 403) and restored (HTTP 302 recovery required); in-mesh admin-port denial; and `mutual_tls` ztunnel metrics on every relevant node.
+A passing run covers ready Authentik/Istio/agentgateway/OpenBao and diagnostic workloads; Authentik branding, flow, stage and policy parity plus a test-administrator login (not Google verification); Programmed gateways and Accepted/ResolvedRefs routes; ambient enrollment without sidecars; exact `200` for public endpoints and exact `302` to Authentik for protected paths with and without forged identity headers; Authentik protection of the agentgateway admin UI; OpenBao health and denied unauthenticated or forged-token access; fail-closed behavior with Authentik scaled to zero (protected requests denied with HTTP 403, or a connection failure reported as status `000` with a nonzero curl exit) and restored (HTTP 302 recovery required); in-mesh admin-port denial; and `mutual_tls` ztunnel metrics on every relevant node.
 
 If restoration or recovery fails, state that explicitly, do not continue, and diagnose with the owning Authentik component script. Do not manually scale workloads with ad-hoc commands. Do not report the fail-closed check as successful until restoration and recovery were both observed.
 
