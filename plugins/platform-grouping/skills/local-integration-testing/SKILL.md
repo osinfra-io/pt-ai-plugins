@@ -33,7 +33,7 @@ tests/integration/setup.sh --claim   # --claim only on a fresh dedicated cluster
 
 The order is Istio ambient runtime and shared gateway, Authentik (local PostgreSQL, real deployment and configuration modules), browser-auth policies and routes, agentgateway, then OpenBao. Do not apply every root at once; Kubernetes manifest providers need CRDs at plan time. Components can be rerun individually (`tests/integration/<component>/setup.sh`, plus `istio/apply-auth.sh` and `istio/apply-routes.sh`) after editing the matching checked-out module without resetting the database.
 
-For a fresh database the test-only administrator is `akadmin` / `akadmin` at `https://authentik.localhost/if/admin/`; never use that password elsewhere. Credentials, OpenBao's root token and unseal key, and state live in ignored `.work/` directories; never print them.
+For a fresh database the test-only administrator is `akadmin` / `akadmin` at `https://authentik.localhost/if/admin/`; never use that password elsewhere. Credentials, OpenBao's root token and unseal key, and state live in ignored `.work/` directories. Never print the Google OAuth values, the `akadmin` password, or the unseal key. The exception is OpenBao's root token, a throwaway for the local cluster: after setup, run `tests/integration/openbao/show-credentials.sh` and give the developer the OpenBao URL (`https://openbao.localhost/ui/`, sign in with the Token method) and the printed root token.
 
 ### Developer handoff
 
@@ -76,7 +76,10 @@ Leave the fixtures running and direct the developer to:
 https://dev.localhost/istio-test/auth
 https://agentgateway.localhost/agentgateway-test/auth
 https://agentgateway.localhost/ui/
+https://openbao.localhost/ui/
 ```
+
+OpenBao uses its own root token rather than Google sign-in; present it with the URL as described above.
 
 Accept the temporary certificate warning and sign in through Google. Both diagnostic paths must return the actual user's trusted `x-authentik-*` identity as JSON (headers, not a bearer JWT). Verify forged identity headers cannot override the actual user. Remove the test user's required local group membership, require denial, then restore membership and verify recovery. Do not change Google/production groups or retain personal identity output in session artifacts. Never offer a direct port-forward as an authenticated UI path.
 
