@@ -66,9 +66,9 @@ After each tag push in Steps 2–4, verify its release before continuing:
 
    If the run has not appeared yet, repeat the query every 15 seconds for up to five minutes. Select the run whose `headBranch` is the tag and whose `headSha` is `TAG_SHA`; do not use a run for another ref or commit.
 2. Check that run with `gh run view <run-id> --repo "$GH_REPO" --json status,conclusion,url`. Wait for it to complete, checking every 15 seconds for up to five minutes. Continue only when `status` is `completed` and `conclusion` is `success`.
-3. Confirm the matching published release with `gh release view "$TAG" --repo "$GH_REPO" --json tagName,url,publishedAt`. If it is not published yet, retry every 15 seconds for up to five minutes after the workflow succeeds.
+3. Confirm the matching published release with `gh release view "$TAG" --repo "$GH_REPO" --json tagName,url,publishedAt`. GitHub returns not found (HTTP 404) while the release has not yet been published; treat only that response as pending and retry every 15 seconds for up to five minutes after the workflow succeeds. Stop immediately for any other query error, including authentication, permission, or network errors.
 
-If a run fails, no matching run appears, the release is not published by the deadline, or a GitHub query returns an error, stop this release chain. Report the tag, the run URL and status when available, and the missing or failed release; do not report that repo as released or continue to dependent releases. Keep the previous/new version summary and include any PR URLs already opened.
+If a run fails, no matching run appears, the release is not published by the deadline, or a GitHub query returns a non-404 error, stop this release chain. Report the tag, the run URL and status when available, and the missing or failed release; do not report that repo as released or continue to dependent releases. Keep the previous/new version summary and include any PR URLs already opened.
 
 ## Step 3 — Release pt-techne-agents (if needed)
 
