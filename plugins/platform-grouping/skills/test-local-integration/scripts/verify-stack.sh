@@ -52,4 +52,4 @@ if ! python3 "${SCRIPT_DIR}/verify-runtime.py"; then
   exit 1
 fi
 
-echo "Automated Pneuma stack checks passed. Google browser sign-in and authenticated identity verification remain pending."
+echo "Automated local integration checks passed. Google browser sign-in and authenticated identity verification remain pending."

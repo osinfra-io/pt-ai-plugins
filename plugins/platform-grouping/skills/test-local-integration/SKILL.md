@@ -1,9 +1,9 @@
 ---
-name: test-pneuma-stack
+name: test-local-integration
 description: Exercise checked-out Authentik, Istio ambient, agentgateway, and OpenBao configuration together in dedicated Docker Desktop Kind Kubernetes before optional sandbox deployment. Coordinates repo-owned tests/kubernetes fixtures and real Google browser sign-in.
 ---
 
-# Test the Pneuma stack
+# Test local integration
 
 This is an **opt-in developer integration test for complex configuration changes**, not a mandatory pre-push check or CI gate. Run the whole stack in Kubernetes, including Authentik and local PostgreSQL. Keep mocked OpenTofu tests separate.
 
