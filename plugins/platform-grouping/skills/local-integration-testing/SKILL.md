@@ -1,9 +1,9 @@
 ---
-name: test-local-gateway-stack
-description: Exercise checked-out Authentik, Istio ambient, and agentgateway configuration together in dedicated Docker Desktop Kind Kubernetes before optional sandbox deployment. Coordinates repo-owned tests/kubernetes fixtures and real Google browser sign-in.
+name: local-integration-testing
+description: Exercise checked-out Authentik, Istio ambient, agentgateway, and OpenBao configuration together in dedicated Docker Desktop Kind Kubernetes before optional sandbox deployment. Coordinates repo-owned tests/kubernetes fixtures and real Google browser sign-in.
 ---
 
-# Test the local gateway stack
+# Test local integration
 
 This is an **opt-in developer integration test for complex configuration changes**, not a mandatory pre-push check or CI gate. Run the whole stack in Kubernetes, including Authentik and local PostgreSQL. Keep mocked OpenTofu tests separate.
 
@@ -16,12 +16,13 @@ Locate these checkouts and read their repository/team instructions:
 - `pt-arche-kubernetes-authentik`
 - `pt-arche-kubernetes-istio`
 - `pt-arche-kubernetes-agentgateway`
+- `pt-arche-kubernetes-openbao`
 - `pt-pneuma-istio-test`
 - `pt-pneuma` for the shared gateway-auth renderer and Authentik authentication module
 
 Use the aggregated workspace layout: module repositories under `arche/`, application/consumer repositories under `pneuma/`. The local module sources use this relative checkout arrangement to share the actual Pneuma renderer without unpublished release pins. Do not claim arbitrary sibling-clone layouts work; arrange the required checkouts in the standard layout first. Exclude `.terraform/` entirely. Record absolute paths and run each command in its owning repository.
 
-All three components participate in a holistic run. Do not silently omit agentgateway because a checkout is missing. Fixtures live in `tests/kubernetes/`; generated credentials, state, and provider files live in ignored `.work/` directories. Relative module sources exercise the developer's checked-out changes. Do not use Docker Compose or maintain a parallel Compose fixture.
+All four components participate in a holistic run. Do not silently omit agentgateway because a checkout is missing. Fixtures live in `tests/kubernetes/`; generated credentials, state, and provider files live in ignored `.work/` directories. Relative module sources exercise the developer's checked-out changes. Do not use Docker Compose or maintain a parallel Compose fixture.
 
 ## Prerequisites and ownership
 
@@ -90,6 +91,14 @@ Then from agentgateway:
 tests/kubernetes/setup.sh
 ```
 
+Then from OpenBao (a single-replica HA Raft instance behind `https://openbao.localhost`, publicly routed without Authentik because OpenBao enforces its own tokens):
+
+```bash
+tests/kubernetes/setup.sh
+```
+
+This initializes and unseals OpenBao, saving the root token and unseal key in the component's ignored `.work/` directory. Never print them.
+
 This invokes its checked-out deployment and manifest modules in separate stages, not copied chart versions or a second proxy configuration.
 
 Rerun the relevant component setup/apply after editing application configuration, then rerun verification without resetting the database. Do not switch to a released module pin that would omit local edits.
@@ -134,6 +143,7 @@ Require:
 - Exactly `302` to Authentik for protected paths, with the correct per-host outpost callback, both with and without forged identity headers.
 - Outpost ping `204`, reachable callback routing, and the registered Google localhost callback.
 - Authentik protection for the agentgateway admin UI.
+- OpenBao initialized and unsealed, ambient with no sidecar, `https://openbao.localhost/v1/sys/health` returning `200`, the UI reachable, and unauthenticated or forged-token secret access denied (`403`).
 
 The shared HTTP verifier uses loopback explicitly while preserving host/SNI, disables proxy use for local requests, and never follows protected redirects. Its expected-status mode polls only the allowlisted local HTTPS hostnames and reports the last observed status at timeout. It does not read credentials or store browser cookies.
 
@@ -179,14 +189,14 @@ Use bounded waits. Do not downgrade Istio or agentgateway to sidestep incompatib
 
 ## Cleanup
 
-Cleanup is explicit and owned-resource-only. It deletes all fixture namespaces, including local users and PostgreSQL data. Stop agentgateway first, then Authentik, then Istio:
+Cleanup is explicit and owned-resource-only. It deletes all fixture namespaces, including local users and PostgreSQL data. Stop OpenBao first, then agentgateway, then Authentik, then Istio:
 
 ```bash
 # In each owning repository:
 tests/kubernetes/teardown.sh
 ```
 
-Teardown removes `agentgateway`, `authentik`, `istio-system`, `istio-ingress`, and `istio-test` after checking fixture ownership. Authentik clears application configuration state after deleting its namespace and database volume so the next setup imports newly bootstrapped objects rather than using stale IDs. Generated local credentials remain in `.work/`, but users, memberships, and application data are recreated on the next setup. No separate reset command is needed. Rerunning setup without teardown still preserves the running database for iteration.
+Teardown removes `openbao`, `agentgateway`, `authentik`, `istio-system`, `istio-ingress`, and `istio-test` after checking fixture ownership. Authentik clears application configuration state after deleting its namespace and database volume so the next setup imports newly bootstrapped objects rather than using stale IDs. Generated local credentials remain in `.work/`, but users, memberships, and application data are recreated on the next setup. No separate reset command is needed. Rerunning setup without teardown still preserves the running database for iteration.
 
 Agentgateway's local CRD chart uses a Bash post-renderer with `jq` that invokes `kubectl --local` and preserves each manifest's document boundary while adding Helm's `keep` resource policy. This retains its cluster-wide CRDs when the component's release and namespace are destroyed; ordinary cloud deployment defaults are unchanged.
 

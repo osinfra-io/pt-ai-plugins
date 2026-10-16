@@ -15,8 +15,9 @@ readonly WORKSPACE_ROOT
 readonly AUTHENTIK_REPO="${WORKSPACE_ROOT}/arche/pt-arche-kubernetes-authentik"
 readonly ISTIO_REPO="${WORKSPACE_ROOT}/arche/pt-arche-kubernetes-istio"
 readonly AGENTGATEWAY_REPO="${WORKSPACE_ROOT}/arche/pt-arche-kubernetes-agentgateway"
+readonly OPENBAO_REPO="${WORKSPACE_ROOT}/arche/pt-arche-kubernetes-openbao"
 
-for repo in "${AUTHENTIK_REPO}" "${ISTIO_REPO}" "${AGENTGATEWAY_REPO}"; do
+for repo in "${AUTHENTIK_REPO}" "${ISTIO_REPO}" "${AGENTGATEWAY_REPO}" "${OPENBAO_REPO}"; do
   if [ ! -x "${repo}/tests/kubernetes/verify.sh" ]; then
     echo "Missing executable component verifier: ${repo}/tests/kubernetes/verify.sh" >&2
     exit 1
@@ -37,6 +38,7 @@ run_component_verifier() {
 run_component_verifier "Istio" "${ISTIO_REPO}"
 run_component_verifier "Authentik" "${AUTHENTIK_REPO}"
 run_component_verifier "Agentgateway" "${AGENTGATEWAY_REPO}"
+run_component_verifier "OpenBao" "${OPENBAO_REPO}"
 
 echo "==> Running holistic anonymous HTTP verification"
 if ! python3 "${SCRIPT_DIR}/verify-http.py"; then
@@ -50,4 +52,4 @@ if ! python3 "${SCRIPT_DIR}/verify-runtime.py"; then
   exit 1
 fi
 
-echo "Automated gateway-stack checks passed. Google browser sign-in and authenticated identity verification remain pending."
+echo "Automated local integration checks passed. Google browser sign-in and authenticated identity verification remain pending."
