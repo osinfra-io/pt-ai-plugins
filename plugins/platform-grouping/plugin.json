@@ -1,7 +1,7 @@
 {
   "name": "platform-grouping",
   "description": "Shared osinfra-io platform workflows as Copilot skills.",
-  "version": "0.1.15",
+  "version": "0.1.16",
   "author": {
     "name": "osinfra-io"
   },
