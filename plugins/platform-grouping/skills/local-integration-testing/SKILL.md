@@ -37,7 +37,7 @@ If a checked-in script is itself broken, fix it with the edit tool as a small re
 
 The order is Istio ambient runtime and shared gateway, Authentik (local PostgreSQL, real deployment and configuration modules), browser-auth policies and routes, agentgateway, then OpenBao. Do not apply every root at once; Kubernetes manifest providers need CRDs at plan time. Components can be rerun individually (`tests/integration/<component>/setup.sh`, plus `istio/apply-auth.sh` and `istio/apply-routes.sh`) after editing the matching checked-out module without resetting the database.
 
-For a fresh database the test-only administrator is `akadmin` / `akadmin` at `https://authentik.localhost/if/admin/`; never use that password elsewhere. Credentials, OpenBao's root token and unseal key, and state live in ignored `.work/` directories. Never print the Google OAuth values, the `akadmin` password, or the unseal key. The exception is OpenBao's root token, a throwaway for the local cluster: after setup, run `tests/integration/openbao/show-credentials.sh` and give the developer the OpenBao URL (`https://openbao.localhost/ui/`, sign in with the Token method) and the printed root token.
+For a fresh database the test-only administrator is `akadmin` / `akadmin` at `https://authentik.localhost/if/admin/`; never use that password elsewhere. Credentials, OpenBao's root token and unseal key, and state live in ignored `.work/` directories. Never print the Google OAuth values, the `akadmin` password, or the unseal key. The exception is OpenBao's root token, a throwaway for the local cluster: after setup, run `tests/integration/openbao/show-credentials.sh` and give the developer the OpenBao URL (`https://openbao.localhost/ui/`) and printed root token as a local administrative fallback. Prefer the configured OIDC method when testing the new login integration; the root token is not an OIDC login.
 
 ### Developer handoff
 
@@ -48,6 +48,7 @@ After setup, explain how to test a change:
 - Do not tear down during normal iteration. Teardown deletes local users, memberships, and database data.
 - Explain the fidelity boundary: authentication configuration and Istio browser-auth rendering are shared with the cloud; local domains, OAuth client/callback, application IDs, and explicit local groups substitute for cloud discovery. PostgreSQL, upstream images, local TLS, and Kind substitute for Cloud SQL, mirrored registries, cloud certificates, Workload Identity, and GCP networking. Cloud root discovery, environment enablement, and multi-region behavior still require sandbox verification.
 - Local testing does not deploy sandbox or update released module pins.
+- Include the OpenBao UI method/role, certificate-aware CLI command, and hostname-resolution prerequisites from Browser verification in the handoff.
 
 To add a component host, edit `tests/integration/shared/hostnames.txt` and the routes in `pt-pneuma`; no module repository changes.
 
@@ -83,7 +84,25 @@ https://agentgateway.localhost/ui/
 https://openbao.localhost/ui/
 ```
 
-OpenBao uses its own root token rather than Google sign-in; present it with the URL as described above.
+For the OpenBao OIDC check, choose **OIDC** in the UI and use role `default`, then complete Google sign-in through Authentik. From the `pt-pneuma` repository root, in a browser-enabled terminal with `bao` installed, use:
+
+```bash
+BAO_CACERT="$PWD/tests/integration/istio/.work/gateway-localhost.crt" \
+BAO_ADDR=https://openbao.localhost \
+bao login -method=oidc -path=oidc role=default
+```
+
+The CLI must trust the fixture gateway certificate using `BAO_CACERT`; accepting a browser certificate warning does not establish CLI trust. Keep TLS verification enabled.
+
+Both `openbao.localhost` and `authentik.localhost` must resolve to the gateway from the CLI and browser environments. Browsers may resolve `*.localhost` internally while the CLI's system resolver returns “no such host.” When the gateway is reachable on the CLI machine's loopback, the developer can add this `/etc/hosts` entry:
+
+```text
+127.0.0.1 openbao.localhost authentik.localhost
+```
+
+For a container or remote shell, establish the reachable gateway address instead of assuming its loopback is the desktop's. The browser must also be able to reach the CLI callback listener at `http://localhost:8250/oidc/callback`.
+
+OIDC login only receives team policies when the authenticated user's local Authentik `groups` claim contains a group mapped to an OpenBao identity-group alias. Check access with a user whose local membership is configured; a successful login alone does not prove team access. Use the printed local root token with the UI's **Token** method only as the administrative fallback, for example when OIDC is unavailable. Do not report Google sign-in or group-claim verification as complete unless it was observed.
 
 Accept the temporary certificate warning and sign in through Google. Both diagnostic paths must return the actual user's trusted `x-authentik-*` identity as JSON (headers, not a bearer JWT). Verify forged identity headers cannot override the actual user. Remove the test user's required local group membership, require denial, then restore membership and verify recovery. Do not change Google/production groups or retain personal identity output in session artifacts. Never offer a direct port-forward as an authenticated UI path.
 
@@ -101,6 +120,8 @@ Configuration parity is required for a full report: change a relevant checked-ou
 | Public endpoints redirect or protected requests bypass sign-in | Shared authorization inputs, gateway policies, inbound header stripping, ingress logs |
 | Agentgateway route/proxy fails | Chart availability, staged CRDs, route-parent conditions, ReferenceGrant, proxy/controller logs |
 | Browser callback fails | Registered Google localhost URI, Host rewrite, callback redirect, Authentik session host |
+| OpenBao CLI reports unknown certificate authority | Use the fixture gateway certificate with `BAO_CACERT` as shown above |
+| OpenBao callback reports no code or ID token | Inspect only OAuth `error` / `error_description`, not full callback URLs; run `python3 tests/integration/authentik/diagnose-access.py` for redacted server diagnostics. An `Invalid grant_type for provider` rejection requires `authorization_code` on the dedicated Authentik OpenBao provider; correct the module, rerun Authentik setup and both component verifiers, then start a fresh login |
 | In-mesh traffic resets or returns 503 | Workload endpoints, ztunnel identities, mTLS metrics and certificate readiness |
 
 Use bounded waits. Do not downgrade Istio or agentgateway to sidestep incompatibilities; report a blocked version with evidence. Local success does not validate GCP load balancing, Cloud Armor, Workload Identity, Cloud SQL, multi-region behavior, or the full sandbox deployment.
