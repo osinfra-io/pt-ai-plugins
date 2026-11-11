@@ -11,6 +11,6 @@ jobs:
   dependabot:
     name: Dependabot
     if: github.actor == 'dependabot[bot]' && github.event.pull_request.user.login == 'dependabot[bot]' && github.event.pull_request.head.repo.full_name == github.repository
-    uses: osinfra-io/pt-techne-misc-workflows/.github/workflows/dependabot.yml@08a1f8d55cb21e733dc36c5abe3cb0b277114697 # v0.2.9
+    uses: osinfra-io/pt-techne-misc-workflows/.github/workflows/dependabot.yml@a6e9d2c25f434bba7e8164c5567379511b1656c8 # v0.3.3
     secrets:
       pr_approve_and_merge_pem: ${{ secrets.PR_APPROVE_AND_MERGE_PEM }}
