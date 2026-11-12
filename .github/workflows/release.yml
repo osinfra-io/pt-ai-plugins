@@ -12,6 +12,6 @@ permissions:
 jobs:
   release:
     name: Release
-    uses: osinfra-io/pt-techne-misc-workflows/.github/workflows/release.yml@a6e9d2c25f434bba7e8164c5567379511b1656c8  # v0.3.3
+    uses: osinfra-io/pt-techne-misc-workflows/.github/workflows/release.yml@873e5eb069348e446ddc20c9c96661073d4bec42  # v0.3.5
     secrets:
       token: ${{ secrets.GITHUB_TOKEN }}
