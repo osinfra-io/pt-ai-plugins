@@ -1,6 +1,6 @@
 ---
 name: local-integration-testing
-description: Exercise checked-out Authentik, Istio ambient, agentgateway, and OpenBao configuration together in dedicated Docker Desktop Kind Kubernetes before optional sandbox deployment. Runs the pt-pneuma tests/integration suite and coordinates real Google browser sign-in.
+description: Exercise checked-out Authentik, Istio ambient, agentgateway, Agent Substrate, kagent, and OpenBao configuration together in dedicated Docker Desktop Kind Kubernetes before optional sandbox deployment. Runs the pt-pneuma tests/integration suite and coordinates real Google browser sign-in.
 ---
 
 # Test local integration
@@ -16,6 +16,8 @@ Use the aggregated workspace layout: module repositories under `arche/`, `pt-pne
 Run everything from `pt-pneuma`. The preflight (`tests/integration/shared/preflight.sh`, run by `setup.sh`) checks Docker, the explicit `docker-desktop` context, Docker Desktop's **Kind** provisioner, ambient mount propagation, and fixture ownership. On a fresh **dedicated** cluster pass `--claim` to record ownership; it refuses existing namespaces, Helm installations, or gateway/mesh CRDs. A context name or matching resource name does not establish ownership.
 
 Do not silently change contexts, adopt existing resources, uninstall existing installations, purge CRDs, or reset Docker Desktop Kubernetes. Allocate enough CPU/memory for the ambient and application workloads and never fall back to sidecars.
+
+Agent Substrate needs the `certificates.k8s.io/v1beta1` API and the `ClusterTrustBundle`, `ClusterTrustBundleProjection` and `PodCertificateRequest` feature gates on the Kind node (kube-apiserver and kubelet), plus `go` to run upstream `ate-setup`. Its `setup.sh` stops with a message if the API is missing. Enabling the gates edits the shared Docker Desktop node: back up the manifests first, confirm with the developer, and note that Docker Desktop updates or resets may undo them.
 
 Real Google authentication requires `TF_VAR_google_oauth_client_id` and `TF_VAR_google_oauth_client_secret`. Never print their values, persist them in tracked files, or log tokens, cookies, callback codes, or identity JSON. The Google web client must allow:
 
@@ -35,7 +37,7 @@ tests/integration/setup.sh --claim   # --claim only on a fresh dedicated cluster
 
 If a checked-in script is itself broken, fix it with the edit tool as a small reusable change in `pt-pneuma/tests/integration` (with a test where one exists) and open a PR for it. Do not work around it with inline commands or rewrite files with scripts. Prefer one definition of shared constants, such as `shared/owner.sh`, over redeclaring them in component scripts.
 
-The order is Istio ambient runtime and shared gateway, Authentik (local PostgreSQL, real deployment and configuration modules), browser-auth policies and routes, agentgateway, then OpenBao. Do not apply every root at once; Kubernetes manifest providers need CRDs at plan time. Components can be rerun individually (`tests/integration/<component>/setup.sh`, plus `istio/apply-auth.sh` and `istio/apply-routes.sh`) after editing the matching checked-out module without resetting the database.
+The order is Istio ambient runtime and shared gateway, Authentik (local PostgreSQL, real deployment and configuration modules), browser-auth policies and routes, agentgateway, Agent Substrate, kagent, then OpenBao. Do not apply every root at once; Kubernetes manifest providers need CRDs at plan time. Components can be rerun individually (`tests/integration/<component>/setup.sh`, plus `istio/apply-auth.sh` and `istio/apply-routes.sh`) after editing the matching checked-out module without resetting the database.
 
 For a fresh database the test-only administrator is `akadmin` / `akadmin` at `https://authentik.localhost/if/admin/`; never use that password elsewhere. Credentials, OpenBao's root token and unseal key, and state live in ignored `.work/` directories. Never print the Google OAuth values, the `akadmin` password, or the unseal key. The exception is OpenBao's root token, a throwaway for the local cluster: after setup, run `tests/integration/openbao/show-credentials.sh` and give the developer the OpenBao URL (`https://openbao.localhost/ui/`) and printed root token as a local administrative fallback. Prefer the configured OIDC method when testing the new login integration; the root token is not an OIDC login.
 
@@ -69,7 +71,7 @@ python3 tests/integration/verify/verify-http.py --expect-status 302 --timeout 12
 
 Use the expected status for the specific temporary behavior, restore the intended configuration, reapply it, and wait for the original status the same way. A single immediate sample can race Istio propagation.
 
-A passing run covers ready Authentik/Istio/agentgateway/OpenBao and diagnostic workloads; Authentik branding, flow, stage and policy parity plus a test-administrator login (not Google verification); Programmed gateways and Accepted/ResolvedRefs routes; ambient enrollment without sidecars; exact `200` for public endpoints and exact `302` to Authentik for protected paths with and without forged identity headers; Authentik protection of the agentgateway admin UI; OpenBao health and denied unauthenticated or forged-token access; fail-closed behavior with Authentik scaled to zero (protected requests denied with HTTP 403, or a connection failure reported as status `000` with a nonzero curl exit) and restored (HTTP 302 recovery required); in-mesh admin-port denial; and `mutual_tls` ztunnel metrics on every relevant node.
+A passing run covers ready Authentik/Istio/agentgateway/Agent Substrate/kagent/OpenBao and diagnostic workloads; Authentik branding, flow, stage and policy parity plus a test-administrator login (not Google verification); Programmed gateways and Accepted/ResolvedRefs routes; ambient enrollment without sidecars; exact `200` for public endpoints and exact `302` to Authentik for protected paths with and without forged identity headers; Authentik protection of the agentgateway admin UI and the kagent UI (`kagent.localhost`, kagent Admins group); OpenBao health and denied unauthenticated or forged-token access; fail-closed behavior with Authentik scaled to zero (protected requests denied with HTTP 403, or a connection failure reported as status `000` with a nonzero curl exit) and restored (HTTP 302 recovery required); in-mesh admin-port denial; and `mutual_tls` ztunnel metrics on every relevant node.
 
 If restoration or recovery fails, state that explicitly, do not continue, and diagnose with the owning Authentik component script. Do not manually scale workloads with ad-hoc commands. Do not report the fail-closed check as successful until restoration and recovery were both observed.
 
@@ -81,6 +83,7 @@ Leave the fixtures running and direct the developer to:
 https://dev.localhost/istio-test/auth
 https://agentgateway.localhost/agentgateway-test/auth
 https://agentgateway.localhost/ui/
+https://kagent.localhost/
 https://openbao.localhost/ui/
 ```
 
@@ -119,6 +122,7 @@ Configuration parity is required for a full report: change a relevant checked-ou
 | Ambient enrollment fails | Kind provisioner, mount propagation, CNI and ztunnel logs |
 | Public endpoints redirect or protected requests bypass sign-in | Shared authorization inputs, gateway policies, inbound header stripping, ingress logs |
 | Agentgateway route/proxy fails | Chart availability, staged CRDs, route-parent conditions, ReferenceGrant, proxy/controller logs |
+| Substrate or kagent controller cannot start | `substrate-podcert` controller and CA pools in `podcertificate-controller-system`, the `ate.dev/api-access=true` label on the kagent namespace, Postgres Secrets and grants, `ate-api-authentication` ConfigMap |
 | Browser callback fails | Registered Google localhost URI, Host rewrite, callback redirect, Authentik session host |
 | OpenBao CLI reports unknown certificate authority | Use the fixture gateway certificate with `BAO_CACERT` as shown above |
 | OpenBao callback reports no code or ID token | Inspect only OAuth `error` / `error_description`, not full callback URLs; run `python3 tests/integration/authentik/diagnose-access.py` for redacted server diagnostics. An `Invalid grant_type for provider` rejection requires `authorization_code` on the dedicated Authentik OpenBao provider; correct the module, rerun Authentik setup and both component verifiers, then start a fresh login |
