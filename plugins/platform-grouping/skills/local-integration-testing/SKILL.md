@@ -138,4 +138,6 @@ Cleanup is explicit and owned-resource-only; it deletes all fixture namespaces, 
 tests/integration/teardown.sh
 ```
 
-It stops OpenBao, then agentgateway, Authentik, and Istio, after checking ownership. Generated credentials remain in `.work/`. Agentgateway's CRDs are deliberately retained by a local post-renderer. Do not remove cluster-wide CRDs or unowned installations, and report retained namespaces, data, and helper processes accurately.
+It stops OpenBao, kagent, Agent Substrate, agentgateway, Authentik, and Istio, after checking ownership. Generated credentials remain in `.work/`. Agentgateway's CRDs are deliberately retained by a local post-renderer. Do not remove cluster-wide CRDs or unowned installations, and report retained namespaces, data, and helper processes accurately.
+
+When tearing down fixtures individually, tear down kagent before Agent Substrate: the substrate uninstall hangs while kagent's WorkerPool still exists. The Agent Substrate teardown removes the `substrate-podcert` release and namespace only when setup labelled that namespace `local-fixture.osinfra.io/owner=agent-substrate`; an unlabelled one is skipped. Teardown does not undo the Docker Desktop node edits (kube-apiserver and kubelet feature gates), which Docker Desktop updates or resets may also revert.
