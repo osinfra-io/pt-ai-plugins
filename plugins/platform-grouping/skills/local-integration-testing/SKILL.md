@@ -88,6 +88,7 @@ https://dev.localhost/istio-test/auth
 https://agentgateway.localhost/agentgateway-test/auth
 https://agentgateway.localhost/ui/
 https://kagent.localhost/
+https://authentik.localhost/
 https://openbao.localhost/ui/
 ```
 
