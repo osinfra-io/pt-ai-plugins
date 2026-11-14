@@ -13,7 +13,7 @@ All fixtures, shared helpers, hostnames, and verifiers live in `pt-pneuma/tests/
 
 Use the aggregated workspace layout: module repositories under `arche/`, `pt-pneuma` and `pt-pneuma-istio-test` under `pneuma/`, and `logos/pt-logos`. Fixtures use the checked-out modules (including uncommitted edits) through relative sources; do not claim arbitrary sibling-clone layouts work. Exclude `.terraform/` entirely. Read each repository's instructions before changing it.
 
-Run everything from `pt-pneuma`. The preflight (`tests/integration/shared/preflight.sh`, run by `setup.sh`) checks Docker, the explicit `docker-desktop` context, Docker Desktop's **Kind** provisioner, ambient mount propagation, and fixture ownership. On a fresh **dedicated** cluster pass `--claim` to record ownership; it refuses existing namespaces, Helm installations, or gateway/mesh CRDs. A context name or matching resource name does not establish ownership.
+Run everything from `pt-pneuma`. The preflight (`tests/integration/shared/preflight.sh`, run by `setup.sh`) checks Docker, the explicit `docker-desktop` context, Docker Desktop's **Kind** provisioner, ambient mount propagation, and fixture ownership. On an unowned cluster it automatically records ownership only when no non-system namespaces, Helm installations, or gateway/mesh CRDs exist. A context name or matching resource name does not establish ownership.
 
 Do not silently change contexts, adopt existing resources, uninstall existing installations, purge CRDs, or reset Docker Desktop Kubernetes. Allocate enough CPU/memory for the ambient and application workloads and never fall back to sidecars.
 
@@ -29,12 +29,10 @@ The gateway rewrites Google source requests to the `localhost` Host and returns 
 
 ## Setup and iteration
 
-Before claiming an unowned cluster, inspect the component `.work` directories for existing `*.tfstate*` files without reading their contents. These local states persist across cluster resets and teardown; the ownership marker and cluster preflight do not establish that they belong to the current cluster. If any state exists while the cluster has no ownership marker, stop and resolve its provenance before claiming or applying anything. Preserve state and credentials; do not delete, move, or reuse them as a shortcut.
-
-Run `tests/integration/shared/preflight.sh` first (without `--claim`) to check an existing stack. If it fails only with `No ownership marker`, prompt the developer to confirm that the cluster is dedicated to these tests and authorize claiming it. Also confirm that local fixture state is absent or has been explicitly reconciled. Only then run `setup.sh --claim`, which validates that no namespaces, Helm installations, or gateway/mesh CRDs exist before recording ownership. If confirmation is unavailable or declined, stop without claiming. Stop on any other preflight failure.
+Run `tests/integration/setup.sh`. On an unowned cluster, preflight refuses setup if it finds a non-system namespace, Helm release, or gateway/mesh CRD. If the cluster passes those emptiness checks, preflight records ownership and removes the known component `.work` directories (`istio`, `authentik`, `agentgateway`, `agent-substrate`, `kagent`, and `openbao`) before setup. This intentionally clears state and generated local credentials left behind after a cluster reset; provide the Google OAuth variables again. On an already-owned cluster, preflight leaves `.work` untouched. If an ownership marker belongs to another owner or any emptiness check fails, stop and resolve the cluster instead of adopting resources or deleting state.
 
 ```bash
-tests/integration/setup.sh --claim   # --claim only on a fresh dedicated cluster
+tests/integration/setup.sh
 ```
 
 If a checked-in script is itself broken, fix it with the edit tool as a small reusable change in `pt-pneuma/tests/integration` (with a test where one exists) and open a PR for it. Do not work around it with inline commands or rewrite files with scripts. Prefer one definition of shared constants, such as `shared/owner.sh`, over redeclaring them in component scripts.
@@ -123,7 +121,7 @@ Configuration parity is required for a full report: change a relevant checked-ou
 
 | Failure | Inspect |
 | --- | --- |
-| Ownership guard rejects setup | Existing state and installations; preserve the old stack and resolve migration explicitly |
+| Cluster preflight rejects setup | Existing namespaces, Helm installations, gateway/mesh CRDs, or a foreign ownership marker; preserve the existing stack and resolve its ownership |
 | Authentik reports a unique-name conflict for a built-in object | Local `.work` state provenance and the current Authentik instance; preserve both and stop before retrying or resetting the database |
 | Authentik bootstrap/API objects not ready | Kubernetes PostgreSQL/server/worker status and redacted logs |
 | Ambient enrollment fails | Kind provisioner, mount propagation, CNI and ztunnel logs |
