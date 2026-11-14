@@ -31,7 +31,7 @@ The gateway rewrites Google source requests to the `localhost` Host and returns 
 
 Before claiming an unowned cluster, inspect the component `.work` directories for existing `*.tfstate*` files without reading their contents. These local states persist across cluster resets and teardown; the ownership marker and cluster preflight do not establish that they belong to the current cluster. If any state exists while the cluster has no ownership marker, stop and resolve its provenance before claiming or applying anything. Preserve state and credentials; do not delete, move, or reuse them as a shortcut.
 
-Run `tests/integration/shared/preflight.sh` first (without `--claim`) to check an existing stack. If it fails only with `No ownership marker`, the cluster is unclaimed: confirm with the developer that it is a dedicated test cluster and that local fixture state is absent or has been explicitly reconciled, then run `setup.sh --claim`, which validates that no namespaces, Helm installations, or gateway/mesh CRDs exist before recording ownership. Stop on any other preflight failure.
+Run `tests/integration/shared/preflight.sh` first (without `--claim`) to check an existing stack. If it fails only with `No ownership marker`, prompt the developer to confirm that the cluster is dedicated to these tests and authorize claiming it. Also confirm that local fixture state is absent or has been explicitly reconciled. Only then run `setup.sh --claim`, which validates that no namespaces, Helm installations, or gateway/mesh CRDs exist before recording ownership. If confirmation is unavailable or declined, stop without claiming. Stop on any other preflight failure.
 
 ```bash
 tests/integration/setup.sh --claim   # --claim only on a fresh dedicated cluster
