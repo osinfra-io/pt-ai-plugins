@@ -27,13 +27,13 @@ tests/integration/setup.sh
 
 Preflight uses the current `docker-desktop` Kind cluster. If it is unowned and empty (no non-system namespaces, active Helm releases, or gateway/mesh CRDs), it records ownership and clears the six fixture `.work` directories before setup. This removes stale local state and credentials after a cluster reset; provide OAuth variables again. An already-owned cluster keeps its `.work` data. If preflight finds existing resources or a foreign ownership marker, stop rather than adopting or removing them.
 
-If Agent Substrate reports the certificate API is missing, run:
+If Agent Substrate reports the certificate API is missing, `setup.sh` stops there. Run the following, then rerun `tests/integration/setup.sh`:
 
 ```bash
 tests/integration/agent-substrate/enable-feature-gates.sh
 ```
 
-This updates the dedicated single-node Docker Desktop cluster and waits for readiness. It uses temporary working files, not backups; if the update fails, reset Docker Desktop Kubernetes and retry.
+This updates the dedicated single-node Docker Desktop cluster and waits for readiness. It uses temporary working files (host `.work` and node `/var/tmp`, removed on exit), not backups; if the update fails, reset Docker Desktop Kubernetes and retry.
 
 Setup runs the components in the required order. To iterate, rerun only the affected component's `setup.sh` (or `istio/apply-auth.sh` / `istio/apply-routes.sh`). Do not tear down between ordinary edits; teardown deletes local users and database data.
 
