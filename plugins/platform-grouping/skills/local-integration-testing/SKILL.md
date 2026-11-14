@@ -29,7 +29,9 @@ The gateway rewrites Google source requests to the `localhost` Host and returns 
 
 ## Setup and iteration
 
-Run `tests/integration/shared/preflight.sh` first (without `--claim`) to check an existing stack. If it fails only with `No ownership marker`, the cluster is unclaimed: confirm with the developer that it is a dedicated test cluster, then run `setup.sh --claim`, which validates that no namespaces, Helm installations, or gateway/mesh CRDs exist before recording ownership. Stop on any other preflight failure.
+Before claiming an unowned cluster, inspect the component `.work` directories for existing `*.tfstate*` files without reading their contents. These local states persist across cluster resets and teardown; the ownership marker and cluster preflight do not establish that they belong to the current cluster. If any state exists while the cluster has no ownership marker, stop and resolve its provenance before claiming or applying anything. Preserve state and credentials; do not delete, move, or reuse them as a shortcut.
+
+Run `tests/integration/shared/preflight.sh` first (without `--claim`) to check an existing stack. If it fails only with `No ownership marker`, prompt the developer to confirm that the cluster is dedicated to these tests and authorize claiming it. Also confirm that local fixture state is absent or has been explicitly reconciled. Only then run `setup.sh --claim`, which validates that no namespaces, Helm installations, or gateway/mesh CRDs exist before recording ownership. If confirmation is unavailable or declined, stop without claiming. Stop on any other preflight failure.
 
 ```bash
 tests/integration/setup.sh --claim   # --claim only on a fresh dedicated cluster
@@ -38,6 +40,10 @@ tests/integration/setup.sh --claim   # --claim only on a fresh dedicated cluster
 If a checked-in script is itself broken, fix it with the edit tool as a small reusable change in `pt-pneuma/tests/integration` (with a test where one exists) and open a PR for it. Do not work around it with inline commands or rewrite files with scripts. Prefer one definition of shared constants, such as `shared/owner.sh`, over redeclaring them in component scripts.
 
 The order is Istio ambient runtime and shared gateway, Authentik (local PostgreSQL, real deployment and configuration modules), browser-auth policies and routes, agentgateway, Agent Substrate, kagent, then OpenBao. Do not apply every root at once; Kubernetes manifest providers need CRDs at plan time. Components can be rerun individually (`tests/integration/<component>/setup.sh`, plus `istio/apply-auth.sh` and `istio/apply-routes.sh`) after editing the matching checked-out module without resetting the database.
+
+Give the developer concise progress updates throughout setup and verification: announce the current stage, report each component as its checked-in script confirms completion, and identify any failed stage and what remains. Include the relevant browser URL from Browser verification when its route is configured; label it as awaiting verification until the checks and sign-in have actually succeeded. Treat component setup, automated verification, configuration parity, and Google browser sign-in as separate milestones. Do not infer readiness from startup alone or expose secrets, identity data, or sensitive callback URLs in updates.
+
+If Authentik reports a unique-name conflict for its built-in brand, embedded outpost, or default identification stage, stop rather than rerunning setup or resetting the database. Preserve the `.work` state and the running cluster; reconcile the state with the current Authentik instance explicitly before retrying.
 
 For a fresh database the test-only administrator is `akadmin` / `akadmin` at `https://authentik.localhost/if/admin/`; never use that password elsewhere. Credentials, OpenBao's root token and unseal key, and state live in ignored `.work/` directories. Never print the Google OAuth values, the `akadmin` password, or the unseal key. The exception is OpenBao's root token, a throwaway for the local cluster: after setup, run `tests/integration/openbao/show-credentials.sh` and give the developer the OpenBao URL (`https://openbao.localhost/ui/`) and printed root token as a local administrative fallback. Prefer the configured OIDC method when testing the new login integration; the root token is not an OIDC login.
 
@@ -118,6 +124,7 @@ Configuration parity is required for a full report: change a relevant checked-ou
 | Failure | Inspect |
 | --- | --- |
 | Ownership guard rejects setup | Existing state and installations; preserve the old stack and resolve migration explicitly |
+| Authentik reports a unique-name conflict for a built-in object | Local `.work` state provenance and the current Authentik instance; preserve both and stop before retrying or resetting the database |
 | Authentik bootstrap/API objects not ready | Kubernetes PostgreSQL/server/worker status and redacted logs |
 | Ambient enrollment fails | Kind provisioner, mount propagation, CNI and ztunnel logs |
 | Public endpoints redirect or protected requests bypass sign-in | Shared authorization inputs, gateway policies, inbound header stripping, ingress logs |
